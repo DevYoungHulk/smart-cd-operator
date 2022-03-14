@@ -1,0 +1,20 @@
+# permissions for end users to view canaries.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: canary-viewer-role
+rules:
+- apiGroups:
+  - org.smart.org.smart
+  resources:
+  - canaries
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - org.smart.org.smart
+  resources:
+  - canaries/status
+  verbs:
+  - get
