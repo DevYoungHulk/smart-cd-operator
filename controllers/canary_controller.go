@@ -18,6 +18,17 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/tools/clientcmd"
+	"os"
+	"path/filepath"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -26,6 +37,17 @@ import (
 
 	cdv1alpha1 "github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1"
 )
+
+var canaryGVR = schema.GroupVersionResource{
+	Group:    "cd.org.smart",
+	Version:  "v1alpha1",
+	Resource: "canaries",
+}
+var deployGVR = schema.GroupVersionResource{
+	Group:    "apps",
+	Version:  "v1",
+	Resource: "deployments",
+}
 
 // CanaryReconciler reconciles a Canary object
 type CanaryReconciler struct {
@@ -49,13 +71,103 @@ type CanaryReconciler struct {
 func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	canary := getCanary(&ctx, req.Namespace, req.Name)
+	if canary == nil {
+		deleteDeployment(req.Namespace, req.Name)
+		return ctrl.Result{}, nil
+	}
+	createOrUpdateDeployment(canary)
 
 	return ctrl.Result{}, nil
 }
 
+func deleteDeployment(namespace string, name string) {
+	fmt.Printf("Deleting Deployment namespace:%s name:%s\n", namespace, name)
+	err := clientset.Resource(deployGVR).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	if err != nil {
+		fmt.Printf("Delete Deployment failed namespace:%s name:%s\n", namespace, name)
+	} else {
+		fmt.Printf("Delete Deployment succesed namespace:%s name:%s\n", namespace, name)
+	}
+}
+
+func createOrUpdateDeployment(canary *cdv1alpha1.Canary) {
+	fmt.Printf("Creating Or Updating deployment... namespace:%s name:%s\n", canary.Namespace, canary.Name)
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      canary.Name,
+			Namespace: canary.Namespace,
+		},
+		Spec: canary.Spec.Deployment,
+	}
+	deployment.Spec.Template.ObjectMeta.Labels = canary.Spec.Deployment.Selector.MatchLabels
+	marshal, err := json.Marshal(&deployment)
+	if err != nil {
+		return
+	}
+	utd := &unstructured.Unstructured{}
+	if err = json.Unmarshal(marshal, &utd.Object); err != nil {
+		return
+	}
+	namespace := clientset.Resource(deployGVR).Namespace(canary.Namespace)
+	get, _ := namespace.Get(context.TODO(), canary.Name, metav1.GetOptions{})
+
+	if get == nil {
+		create, err := namespace.
+			Create(context.TODO(), utd, metav1.CreateOptions{})
+		if err != nil {
+			return
+		}
+		fmt.Printf("Created deployment %q.\n", create.GetName())
+
+	} else {
+		update, err := namespace.
+			Update(context.TODO(), utd, metav1.UpdateOptions{})
+		if err != nil {
+			return
+		}
+		fmt.Printf("Updated deployment %q.\n", update.GetName())
+	}
+
+}
+
+func getCanary(ctx *context.Context, namespace string, name string) *cdv1alpha1.Canary {
+	list, err := clientset.Resource(canaryGVR).Namespace(namespace).Get(*ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil
+	}
+	data, err := list.MarshalJSON()
+	if err != nil {
+		panic(err)
+	}
+	var canary cdv1alpha1.Canary
+	if err = json.Unmarshal(data, &canary); err != nil {
+		panic(err)
+	}
+	return &canary
+}
+
+func initClientSet() dynamic.Interface {
+	kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		panic(err)
+	}
+	clientset, err := dynamic.NewForConfig(config)
+	if err != nil {
+		panic(err)
+	}
+	return clientset
+}
+
+var clientset dynamic.Interface
+var once sync.Once
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *CanaryReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	once.Do(func() {
+		clientset = initClientSet()
+	})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&cdv1alpha1.Canary{}).
 		Complete(r)

@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,7 +30,7 @@ type CanarySpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of Canary. Edit canary_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	Deployment appsv1.DeploymentSpec `json:"deployment,omitempty"`
 }
 
 // CanaryStatus defines the observed state of Canary
