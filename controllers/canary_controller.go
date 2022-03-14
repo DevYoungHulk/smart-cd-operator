@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	orgsmartv1alpha1 "github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1"
+	cdv1alpha1 "github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1"
 )
 
 // CanaryReconciler reconciles a Canary object
@@ -33,9 +33,9 @@ type CanaryReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=org.smart.org.smart,resources=canaries,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=org.smart.org.smart,resources=canaries/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=org.smart.org.smart,resources=canaries/finalizers,verbs=update
+//+kubebuilder:rbac:groups=cd.org.smart,resources=canaries,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=cd.org.smart,resources=canaries/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=cd.org.smart,resources=canaries/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -57,6 +57,6 @@ func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 // SetupWithManager sets up the controller with the Manager.
 func (r *CanaryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&orgsmartv1alpha1.Canary{}).
+		For(&cdv1alpha1.Canary{}).
 		Complete(r)
 }

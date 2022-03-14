@@ -12,7 +12,7 @@ resources:
     namespaced: true
   controller: true
   domain: org.smart
-  group: org.smart
+  group: cd
   kind: Canary
   path: github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1
   version: v1alpha1

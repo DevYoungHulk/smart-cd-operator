@@ -5,7 +5,7 @@ metadata:
   name: canary-editor-role
 rules:
 - apiGroups:
-  - org.smart.org.smart
+  - cd.org.smart
   resources:
   - canaries
   verbs:
@@ -17,7 +17,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - org.smart.org.smart
+  - cd.org.smart
   resources:
   - canaries/status
   verbs:

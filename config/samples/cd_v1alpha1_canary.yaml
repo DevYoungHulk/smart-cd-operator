@@ -1,4 +1,4 @@
-apiVersion: org.smart.org.smart/v1alpha1
+apiVersion: cd.org.smart/v1alpha1
 kind: Canary
 metadata:
   name: canary-sample

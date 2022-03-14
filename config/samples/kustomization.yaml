@@ -1,4 +1,4 @@
 ## Append samples you want in your CSV to this file as resources ##
 resources:
-- org.smart_v1alpha1_canary.yaml
+- cd_v1alpha1_canary.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples
