@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/istio-traffic.iml" filepath="$PROJECT_DIR$/.idea/istio-traffic.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/smart-cd-operator.iml" filepath="$PROJECT_DIR$/.idea/smart-cd-operator.iml" />
     </modules>
   </component>
 </project>
