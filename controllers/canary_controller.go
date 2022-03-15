@@ -19,15 +19,13 @@ package controllers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/tools/clientcmd"
-	"os"
-	"path/filepath"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,17 +80,17 @@ func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func deleteDeployment(namespace string, name string) {
-	fmt.Printf("Deleting Deployment namespace:%s name:%s\n", namespace, name)
+	klog.Infof("Deleting Deployment namespace:%s name:%s\n", namespace, name)
 	err := clientset.Resource(deployGVR).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
-		fmt.Printf("Delete Deployment failed namespace:%s name:%s\n", namespace, name)
+		klog.Infof("Delete Deployment failed namespace:%s name:%s\n", namespace, name)
 	} else {
-		fmt.Printf("Delete Deployment succesed namespace:%s name:%s\n", namespace, name)
+		klog.Infof("Delete Deployment succesed namespace:%s name:%s\n", namespace, name)
 	}
 }
 
 func createOrUpdateDeployment(canary *cdv1alpha1.Canary) {
-	fmt.Printf("Creating Or Updating deployment... namespace:%s name:%s\n", canary.Namespace, canary.Name)
+	klog.Infof("Creating Or Updating deployment... namespace:%s name:%s\n", canary.Namespace, canary.Name)
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      canary.Name,
@@ -103,10 +101,12 @@ func createOrUpdateDeployment(canary *cdv1alpha1.Canary) {
 	deployment.Spec.Template.ObjectMeta.Labels = canary.Spec.Deployment.Selector.MatchLabels
 	marshal, err := json.Marshal(&deployment)
 	if err != nil {
+		klog.Error(err)
 		return
 	}
 	utd := &unstructured.Unstructured{}
 	if err = json.Unmarshal(marshal, &utd.Object); err != nil {
+		klog.Error(err)
 		return
 	}
 	namespace := clientset.Resource(deployGVR).Namespace(canary.Namespace)
@@ -116,17 +116,19 @@ func createOrUpdateDeployment(canary *cdv1alpha1.Canary) {
 		create, err := namespace.
 			Create(context.TODO(), utd, metav1.CreateOptions{})
 		if err != nil {
+			klog.Error(err)
 			return
 		}
-		fmt.Printf("Created deployment %q.\n", create.GetName())
+		klog.Infof("Created deployment %q.\n", create.GetName())
 
 	} else {
 		update, err := namespace.
 			Update(context.TODO(), utd, metav1.UpdateOptions{})
 		if err != nil {
+			klog.Error(err)
 			return
 		}
-		fmt.Printf("Updated deployment %q.\n", update.GetName())
+		klog.Infof("Updated deployment %q.\n", update.GetName())
 	}
 
 }
@@ -134,26 +136,28 @@ func createOrUpdateDeployment(canary *cdv1alpha1.Canary) {
 func getCanary(ctx *context.Context, namespace string, name string) *cdv1alpha1.Canary {
 	list, err := clientset.Resource(canaryGVR).Namespace(namespace).Get(*ctx, name, metav1.GetOptions{})
 	if err != nil {
+		klog.Error(err)
 		return nil
 	}
 	data, err := list.MarshalJSON()
 	if err != nil {
-		panic(err)
+		klog.Error(err)
+		return nil
 	}
 	var canary cdv1alpha1.Canary
 	if err = json.Unmarshal(data, &canary); err != nil {
-		panic(err)
+		klog.Error(err)
+		return nil
 	}
 	return &canary
 }
 
 func initClientSet() dynamic.Interface {
-	kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	cfg, err := config.GetConfig()
 	if err != nil {
 		panic(err)
 	}
-	clientset, err := dynamic.NewForConfig(config)
+	clientset, err := dynamic.NewForConfig(cfg)
 	if err != nil {
 		panic(err)
 	}
