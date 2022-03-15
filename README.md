@@ -7,6 +7,7 @@ operator-sdk create api --version=v1alpha1 --kind=Canary --group cd
 go mod tidy
 go mod vendor
 
+make build
 make install
 
 make run
