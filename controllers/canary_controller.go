@@ -53,6 +53,9 @@ type CanaryReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings,verbs=*
+//+kubebuilder:rbac:groups="",resources=configmaps;endpoints;events;persistentvolumeclaims;pods;namespaces;secrets;serviceaccounts;services;services/finalizers,verbs=*
+//+kubebuilder:rbac:groups=apps,resources=deployments;replicasets;daemonsets;statefulsets,verbs=*
 //+kubebuilder:rbac:groups=cd.org.smart,resources=canaries,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cd.org.smart,resources=canaries/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cd.org.smart,resources=canaries/finalizers,verbs=update
