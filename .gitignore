@@ -16,4 +16,4 @@ vendor/
 .idea
 *.iml
 
-#bin/
+bin/
