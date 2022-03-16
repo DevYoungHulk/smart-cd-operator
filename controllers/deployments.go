@@ -34,11 +34,13 @@ func createOrUpdateDeployment(canary *cdv1alpha1.Canary) error {
 	klog.Infof("Creating Or Updating deployment... namespace:%s name:%s\n", canary.Namespace, canary.Name)
 	bytes, err2 := json.Marshal(canary.Spec.Deployment)
 	if err2 != nil {
+		klog.Error(err2)
 		return err2
 	}
 	deploymentSpec := &appsv1.DeploymentSpec{}
 	err2 = json.Unmarshal(bytes, deploymentSpec)
 	if err2 != nil {
+		klog.Error(err2)
 		return err2
 	}
 	deployment := &appsv1.Deployment{
