@@ -32,14 +32,22 @@ func deleteDeployment(namespace string, name string) error {
 
 func createOrUpdateDeployment(canary *cdv1alpha1.Canary) error {
 	klog.Infof("Creating Or Updating deployment... namespace:%s name:%s\n", canary.Namespace, canary.Name)
+	bytes, err2 := json.Marshal(canary.Spec.Deployment)
+	if err2 != nil {
+		return err2
+	}
+	deploymentSpec := &appsv1.DeploymentSpec{}
+	err2 = json.Unmarshal(bytes, deploymentSpec)
+	if err2 != nil {
+		return err2
+	}
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      canary.Name,
 			Namespace: canary.Namespace,
 		},
-		Spec: canary.Spec.Deployment,
+		Spec: *deploymentSpec,
 	}
-	deployment.Spec.Template.ObjectMeta.Labels = canary.Spec.Deployment.Selector.MatchLabels
 	marshal, err := json.Marshal(&deployment)
 	if err != nil {
 		klog.Error(err)

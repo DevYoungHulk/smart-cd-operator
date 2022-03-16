@@ -33,7 +33,10 @@ spec:
           metadata:
             type: object
           spec:
-            description: CanarySpec defines the desired state of Canary
+            description: 'EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN! NOTE:
+              json tags are required.  Any new fields you add must have json tags
+              for the fields to be serialized. CanarySpec defines the desired state
+              of Canary'
             properties:
               deployment:
                 description: Foo is an example field of Canary. Edit canary_types.go
@@ -170,7 +173,24 @@ spec:
                     description: Template describes the pods that will be created.
                     properties:
                       metadata:
-                        description: 'Standard object''s metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata'
+                        properties:
+                          annotations:
+                            additionalProperties:
+                              type: string
+                            description: 'Annotations is an unstructured key value
+                              map stored with a resource that may be set by external
+                              tools to store and retrieve arbitrary metadata. They
+                              are not queryable and should be preserved when modifying
+                              objects. More info: http://kubernetes.io/docs/user-guide/annotations'
+                            type: object
+                          labels:
+                            additionalProperties:
+                              type: string
+                            description: 'Map of string keys and values that can be
+                              used to organize and categorize (scope and select) objects.
+                              May match selectors of replication controllers and services.
+                              More info: http://kubernetes.io/docs/user-guide/labels'
+                            type: object
                         type: object
                       spec:
                         description: 'Specification of the desired behavior of the
