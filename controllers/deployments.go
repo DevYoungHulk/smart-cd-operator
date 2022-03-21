@@ -82,5 +82,11 @@ func createOrUpdateDeployment(canary *cdv1alpha1.Canary) error {
 		klog.Infof("Updated deployment %q.\n", update.GetName())
 	}
 
-	return nil
+	err2 = createService(canary)
+	if err2 != nil {
+		return err2
+	}
+	//return createServiceAccount(canary)
+	getStartTime()
+	return createServiceMonitor(canary)
 }
