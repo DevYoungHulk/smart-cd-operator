@@ -31,6 +31,12 @@ type CanarySpec struct {
 
 	// Foo is an example field of Canary. Edit canary_types.go to remove/update
 	Deployment SmartDeploymentSpec `json:"deployment,omitempty"`
+	Strategy   Strategy            `json:"strategy,omitempty"`
+}
+type Strategy struct {
+	MaxSurge       string `json:"maxSurge,omitempty"`
+	MaxUnavailable int    `json:"maxUnavailable,omitempty"`
+	Weight         int    `json:"weight,omitempty"`
 }
 
 type SmartPodTemplateSpec struct {

@@ -7,6 +7,7 @@ import (
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"time"
 )
@@ -47,22 +48,22 @@ func createServiceMonitor(canary *cdv1alpha1.Canary) error {
 		klog.Error(err)
 		return err
 	}
-	namespace := ClientSet.Resource(serviceMonitorGVR).Namespace(canary.Namespace)
-	get, _ := namespace.Get(context.TODO(), canary.Name, metav1.GetOptions{})
+	namespaced := ClientSet.Resource(serviceMonitorGVR).Namespace(canary.Namespace)
+	get, _ := namespaced.Get(context.TODO(), canary.Name, metav1.GetOptions{})
 	if get == nil {
-		create, err := namespace.Create(context.TODO(), utd, metav1.CreateOptions{})
+		create, err := namespaced.Create(context.TODO(), utd, metav1.CreateOptions{})
 		if err != nil {
 			klog.Error(err)
 			return err
 		}
 		klog.Infof("Created monitoring %q.\n", create.GetName())
 	} else {
-		//update, err := namespace.Update(context.TODO(), utd, metav1.UpdateOptions{})
-		//if err != nil {
-		//	klog.Error(err)
-		//	return err
-		//}
-		klog.Infof("Monitoring exist %q.\n", get.GetName())
+		patch, err := namespaced.Patch(context.TODO(), s.Name, types.MergePatchType, marshal, metav1.PatchOptions{})
+		if err != nil {
+			klog.Error(err)
+			return err
+		}
+		klog.Infof("Patched Monitoring %q.\n", patch.GetName())
 	}
 	return nil
 }
@@ -77,6 +78,7 @@ func getStartTime() {
 	)
 	if err != nil {
 		klog.Errorf("Error querying Prometheus: %v\n", err)
+	} else {
+		klog.Infof("result -> %s , %v\n", result.String(), warnings)
 	}
-	klog.Infof("result -> %s , %v\n", result.String(), warnings)
 }

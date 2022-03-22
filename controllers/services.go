@@ -7,13 +7,24 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 )
 
 func createService(canary *cdv1alpha1.Canary) error {
+	err := createServices(canary, "stable")
+	if err != nil {
+		return err
+	}
+	return createServices(canary, "canary")
+
+}
+func createServices(canary *cdv1alpha1.Canary, side string) error {
+	labels := canary.Spec.Deployment.Selector.MatchLabels
+	labels["canary"] = side
 	s := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      canary.Name,
+			Name:      canary.Name + "--" + side,
 			Namespace: canary.Namespace,
 			//Labels:    canary.Spec.Deployment.Selector.MatchLabels,
 		},
@@ -24,7 +35,7 @@ func createService(canary *cdv1alpha1.Canary) error {
 					Port: 80,
 				},
 			},
-			Selector:  canary.Spec.Deployment.Selector.MatchLabels,
+			Selector:  labels,
 			ClusterIP: "",
 		},
 	}
@@ -39,22 +50,22 @@ func createService(canary *cdv1alpha1.Canary) error {
 		klog.Error(err)
 		return err
 	}
-	namespace := ClientSet.Resource(serviceGVR).Namespace(canary.Namespace)
-	get, _ := namespace.Get(context.TODO(), canary.Name, metav1.GetOptions{})
+	namespaced := ClientSet.Resource(serviceGVR).Namespace(canary.Namespace)
+	get, err := namespaced.Get(context.TODO(), s.Name, metav1.GetOptions{})
 	if get == nil {
-		create, err := namespace.Create(context.TODO(), utd, metav1.CreateOptions{})
+		create, err := namespaced.Create(context.TODO(), utd, metav1.CreateOptions{})
 		if err != nil {
 			klog.Error(err)
 			return err
 		}
 		klog.Infof("Created svc %q.\n", create.GetName())
 	} else {
-		update, err := namespace.Update(context.TODO(), utd, metav1.UpdateOptions{})
+		patch, err := namespaced.Patch(context.TODO(), s.Name, types.MergePatchType, marshal, metav1.PatchOptions{})
 		if err != nil {
 			klog.Error(err)
 			return err
 		}
-		klog.Infof("Updated svc %q.\n", update.GetName())
+		klog.Infof("Patched svc %q.\n", patch.GetName())
 	}
 	return nil
 }
@@ -81,22 +92,22 @@ func createServiceAccount(canary *cdv1alpha1.Canary) error {
 		klog.Error(err)
 		return err
 	}
-	namespace := ClientSet.Resource(serviceAccountGVR).Namespace(canary.Namespace)
-	get, _ := namespace.Get(context.TODO(), canary.Name, metav1.GetOptions{})
+	namespaced := ClientSet.Resource(serviceAccountGVR).Namespace(canary.Namespace)
+	get, _ := namespaced.Get(context.TODO(), canary.Name, metav1.GetOptions{})
 	if get == nil {
-		create, err := namespace.Create(context.TODO(), utd, metav1.CreateOptions{})
+		create, err := namespaced.Create(context.TODO(), utd, metav1.CreateOptions{})
 		if err != nil {
 			klog.Error(err)
 			return err
 		}
 		klog.Infof("Created serviceAccount %q.\n", create.GetName())
 	} else {
-		update, err := namespace.Update(context.TODO(), utd, metav1.UpdateOptions{})
+		patch, err := namespaced.Patch(context.TODO(), s.Name, types.MergePatchType, marshal, metav1.PatchOptions{})
 		if err != nil {
 			klog.Error(err)
 			return err
 		}
-		klog.Infof("Updated serviceAccount %q.\n", update.GetName())
+		klog.Infof("Patched serviceAccount %q.\n", patch.GetName())
 	}
 	return nil
 }
