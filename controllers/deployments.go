@@ -107,7 +107,7 @@ func genDeployment(canary *cdv1alpha1.Canary, side string, targetReplicas *int32
 	}
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      canary.Name,
+			Name:      canary.Name + "--" + side,
 			Namespace: canary.Namespace,
 		},
 		Spec: *deploymentSpec,
@@ -115,7 +115,6 @@ func genDeployment(canary *cdv1alpha1.Canary, side string, targetReplicas *int32
 	matchLabels := deploymentSpec.Selector.MatchLabels
 	labels := deploymentSpec.Template.ObjectMeta.Labels
 
-	deployment.Name = canary.Name + "--" + side
 	deployment.Spec.Replicas = targetReplicas
 	matchLabels["canary"] = side
 	labels["canary"] = side
