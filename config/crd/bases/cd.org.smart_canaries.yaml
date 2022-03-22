@@ -7583,12 +7583,14 @@ spec:
                 type: object
               strategy:
                 properties:
-                  maxSurge:
-                    type: string
                   maxUnavailable:
+                    format: int32
                     type: integer
-                  weight:
+                  minReadySeconds:
+                    format: int32
                     type: integer
+                  podWeight: {}
+                  trafficWeight: {}
                 type: object
             type: object
           status:

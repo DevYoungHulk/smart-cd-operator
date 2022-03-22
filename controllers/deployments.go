@@ -13,11 +13,15 @@ import (
 
 func deploymentReconcile(canary *cdv1alpha1.Canary, req ctrl.Request) error {
 	if canary == nil {
-		klog.Info("canary deleted -> %s: %s", canary.Namespace, canary.Name)
+		klog.Info("Canary deleted, but deployment not effected. -> %s: %s", canary.Namespace, canary.Name)
 		return nil
 		//return deleteDeployment(req.Namespace, req.Name)
 	}
-	return createOrUpdateDeployment(canary)
+	replicas := *canary.Spec.Deployment.Replicas
+	float := canary.Spec.Strategy.PodWeight
+
+	i := int32(float32(replicas) * float)
+	return applyDeployment(canary, "canary", &i)
 }
 
 func deleteDeployment(namespace string, name string) error {
@@ -32,16 +36,13 @@ func deleteDeployment(namespace string, name string) error {
 	}
 }
 
-func createOrUpdateDeployment(canary *cdv1alpha1.Canary) error {
+func applyDeployment(canary *cdv1alpha1.Canary, side string, targetReplicas *int32) error {
 	klog.Infof("Creating Or Updating deployment... namespace:%s name:%s\n", canary.Namespace, canary.Name)
 
 	namespaced := ClientSet.Resource(deployGVR).Namespace(canary.Namespace)
-	stableApp, _ := namespaced.Get(context.TODO(), canary.Name+"--stable", metav1.GetOptions{})
-	canaryApp, _ := namespaced.Get(context.TODO(), canary.Name+"--canary", metav1.GetOptions{})
+	canaryApp, _ := namespaced.Get(context.TODO(), canary.Name+"--"+side, metav1.GetOptions{})
 
-	utdCanary, err := genDeploymentUtd(canary, "canary", canary.Spec.Deployment.Replicas)
-	var i int32 = 0
-	utdStable, err := genDeploymentUtd(canary, "stable", &i)
+	utdCanary, err := genDeploymentUtd(canary, "canary", targetReplicas)
 	if err != nil {
 		klog.Error(err)
 		return err
@@ -62,29 +63,7 @@ func createOrUpdateDeployment(canary *cdv1alpha1.Canary) error {
 		}
 		klog.Infof("Updated deployment %q.\n", updated.GetName())
 	}
-	if stableApp == nil {
-		created, err1 := namespaced.Create(context.TODO(), utdStable, metav1.CreateOptions{})
-		if err1 != nil {
-			klog.Error(err1)
-			return err1
-		}
-		klog.Infof("Created deployment %q.\n", created.GetName())
-	} else {
-		//data, err1 := genDeploymentPatch(canary, "stable", &i)
-		//if err1 != nil {
-		//	klog.Error(err1)
-		//	return err1
-		//}
-		//patch, err1 := namespace.Patch(context.TODO(), stableApp.GetName(), types.MergePatchType, data, metav1.PatchOptions{})
-		//if err1 != nil {
-		//	klog.Error(err1)
-		//	return err1
-		//}
-		//klog.Infof("patched stable %q.\n", patch.GetName())
-		klog.Infof("Stable version exist %q.\n", canary.GetName())
-	}
-
-	err = serviceReconcile(canary)
+	err = serviceReconcile(canary, side)
 	if err != nil {
 		return err
 	}

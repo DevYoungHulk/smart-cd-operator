@@ -33,10 +33,12 @@ type CanarySpec struct {
 	Deployment SmartDeploymentSpec `json:"deployment,omitempty"`
 	Strategy   Strategy            `json:"strategy,omitempty"`
 }
+
 type Strategy struct {
-	MaxSurge       string `json:"maxSurge,omitempty"`
-	MaxUnavailable int    `json:"maxUnavailable,omitempty"`
-	Weight         int    `json:"weight,omitempty"`
+	MinReadySeconds int32   `json:"minReadySeconds,omitempty"`
+	MaxUnavailable  int32   `json:"maxUnavailable,omitempty"`
+	PodWeight       float32 `json:"podWeight,omitempty"`
+	TrafficWeight   float32 `json:"trafficWeight,omitempty"`
 }
 
 type SmartPodTemplateSpec struct {

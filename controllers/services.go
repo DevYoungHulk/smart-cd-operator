@@ -11,15 +11,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func serviceReconcile(canary *cdv1alpha1.Canary) error {
-	err := createServices(canary, "stable")
-	if err != nil {
-		return err
-	}
-	return createServices(canary, "canary")
-
-}
-func createServices(canary *cdv1alpha1.Canary, side string) error {
+func serviceReconcile(canary *cdv1alpha1.Canary, side string) error {
 	labels := canary.Spec.Deployment.Selector.MatchLabels
 	labels["canary"] = side
 	s := v1.Service{

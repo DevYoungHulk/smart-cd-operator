@@ -4,12 +4,11 @@ metadata:
   namespace: canary-sample
   name: my-nginx-app
 spec:
-  rollout:
+  strategy:
     minReadySeconds: 30
-    strategy:
-      maxSurge: "25%"
-      maxUnavailable: 0
-      Weight: 20
+    maxUnavailable: 0
+    podWeight: 0.25
+    trafficWeight: 0.25
   deployment:
     replicas: 4
     selector:
