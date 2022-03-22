@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func createServiceMonitor(canary *cdv1alpha1.Canary) error {
+func serviceMonitorReconcile(canary *cdv1alpha1.Canary) error {
 	s := monitoringv1.ServiceMonitor{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ServiceMonitor",

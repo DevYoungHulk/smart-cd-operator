@@ -84,13 +84,13 @@ func createOrUpdateDeployment(canary *cdv1alpha1.Canary) error {
 		klog.Infof("Stable version exist %q.\n", canary.GetName())
 	}
 
-	err = createService(canary)
+	err = serviceReconcile(canary)
 	if err != nil {
 		return err
 	}
 	//return createServiceAccount(canary)
 	getStartTime()
-	return createServiceMonitor(canary)
+	return serviceMonitorReconcile(canary)
 }
 
 func genDeployment(canary *cdv1alpha1.Canary, side string, targetReplicas *int32) (*appsv1.Deployment, error) {

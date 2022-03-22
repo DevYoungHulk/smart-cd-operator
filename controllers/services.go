@@ -11,7 +11,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func createService(canary *cdv1alpha1.Canary) error {
+func serviceReconcile(canary *cdv1alpha1.Canary) error {
 	err := createServices(canary, "stable")
 	if err != nil {
 		return err
