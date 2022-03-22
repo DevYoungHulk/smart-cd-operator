@@ -7581,6 +7581,15 @@ spec:
                 - selector
                 - template
                 type: object
+              strategy:
+                properties:
+                  maxSurge:
+                    type: string
+                  maxUnavailable:
+                    type: integer
+                  weight:
+                    type: integer
+                type: object
             type: object
           status:
             description: CanaryStatus defines the observed state of Canary
