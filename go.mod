@@ -13,11 +13,6 @@ require (
 )
 
 require (
-	github.com/r3labs/diff/v2 v2.15.1 // indirect
-	github.com/vmihailenco/msgpack v4.0.4+incompatible // indirect
-)
-
-require (
 	cloud.google.com/go v0.81.0 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.18 // indirect
