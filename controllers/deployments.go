@@ -9,24 +9,43 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"strconv"
 )
 
-func deploymentReconcile(canary *cdv1alpha1.Canary, req ctrl.Request) error {
+func deploymentReconcile(canary *cdv1alpha1.Canary, req ctrl.Request) {
 	if canary == nil {
 		klog.Info("Canary deleted, but deployment not effected. -> %s: %s", canary.Namespace, canary.Name)
-		return nil
+		return
 		//return deleteDeployment(req.Namespace, req.Name)
 	}
-	replicas := *canary.Spec.Deployment.Replicas
-	float := canary.Spec.Strategy.PodWeight
+	if canary.Status.Running {
+		klog.Infof("Last canary is running waiting finished.")
+		return
+	}
+	namespaced := KClientSet.AppsV1().Deployments(canary.Namespace)
+	stableDeploy, err := namespaced.Get(context.TODO(), canary.Name+"--"+Stable, metav1.GetOptions{})
+	if err == nil {
+		image := stableDeploy.Spec.Template.Spec.Containers[0].Image
+		if image == stableDeploy.Spec.Template.Spec.Containers[0].Image {
+			klog.Infof("Nothing will happen image not change [%s]", image)
+			return
+		}
+	}
 
-	i := int32(float32(replicas) * float)
-	return applyDeployment(canary, "canary", &i)
+	replicas := *canary.Spec.Replicas
+	float, _ := strconv.ParseFloat(canary.Spec.Strategy.PodWeight, 64)
+	i := int32(float64(replicas) * float)
+	// create canary version
+	err1 := applyDeployment(canary, Canary, &i)
+	if err1 != nil {
+		return
+	}
+	return
 }
 
 func deleteDeployment(namespace string, name string) error {
 	klog.Infof("Deleting Deployment namespace:%s name:%s\n", namespace, name)
-	err := ClientSet.Resource(deployGVR).Namespace(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	err := KClientSet.AppsV1().Deployments(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		klog.Infof("Delete Deployment failed namespace:%s name:%s\n", namespace, name)
 		return err
@@ -39,16 +58,15 @@ func deleteDeployment(namespace string, name string) error {
 func applyDeployment(canary *cdv1alpha1.Canary, side string, targetReplicas *int32) error {
 	klog.Infof("Creating Or Updating deployment... namespace:%s name:%s\n", canary.Namespace, canary.Name)
 
-	namespaced := ClientSet.Resource(deployGVR).Namespace(canary.Namespace)
-	canaryApp, _ := namespaced.Get(context.TODO(), canary.Name+"--"+side, metav1.GetOptions{})
-
-	utdCanary, err := genDeploymentUtd(canary, "canary", targetReplicas)
+	namespaced := KClientSet.AppsV1().Deployments(canary.Namespace)
+	deploy, err := genDeployment(canary, Canary, targetReplicas)
 	if err != nil {
 		klog.Error(err)
 		return err
 	}
-	if canaryApp == nil {
-		created, err1 := namespaced.Create(context.TODO(), utdCanary, metav1.CreateOptions{})
+	app, _ := namespaced.Get(context.TODO(), canary.Name+"--"+side, metav1.GetOptions{})
+	if app == nil {
+		created, err1 := namespaced.Create(context.TODO(), deploy, metav1.CreateOptions{})
 		if err1 != nil {
 			klog.Error(err1)
 			return err1
@@ -56,24 +74,19 @@ func applyDeployment(canary *cdv1alpha1.Canary, side string, targetReplicas *int
 		klog.Infof("Created deployment %q.\n", created.GetName())
 	} else {
 		updated, err1 := namespaced.
-			Update(context.TODO(), utdCanary, metav1.UpdateOptions{})
+			Update(context.TODO(), deploy, metav1.UpdateOptions{})
 		if err1 != nil {
 			klog.Error(err1)
 			return err1
 		}
 		klog.Infof("Updated deployment %q.\n", updated.GetName())
 	}
-	err = serviceReconcile(canary, side)
-	if err != nil {
-		return err
-	}
-	//return createServiceAccount(canary)
 	getStartTime()
-	return serviceMonitorReconcile(canary)
+	return nil
 }
 
 func genDeployment(canary *cdv1alpha1.Canary, side string, targetReplicas *int32) (*appsv1.Deployment, error) {
-	bytes, err2 := json.Marshal(canary.Spec.Deployment)
+	bytes, err2 := json.Marshal(canary.Spec)
 	if err2 != nil {
 		klog.Error(err2)
 		return nil, err2
@@ -95,8 +108,8 @@ func genDeployment(canary *cdv1alpha1.Canary, side string, targetReplicas *int32
 	labels := deploymentSpec.Template.ObjectMeta.Labels
 
 	deployment.Spec.Replicas = targetReplicas
-	matchLabels["canary"] = side
-	labels["canary"] = side
+	matchLabels[Canary] = side
+	labels[Canary] = side
 	return deployment, nil
 }
 

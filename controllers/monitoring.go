@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func serviceMonitorReconcile(canary *cdv1alpha1.Canary) error {
+func serviceMonitorReconcile(canary *cdv1alpha1.Canary) {
 	s := monitoringv1.ServiceMonitor{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ServiceMonitor",
@@ -27,7 +27,7 @@ func serviceMonitorReconcile(canary *cdv1alpha1.Canary) error {
 		},
 		Spec: monitoringv1.ServiceMonitorSpec{
 			Selector: metav1.LabelSelector{
-				MatchLabels: canary.Spec.Deployment.Selector.MatchLabels,
+				MatchLabels: canary.Spec.Selector.MatchLabels,
 			},
 			Endpoints: []monitoringv1.Endpoint{
 				{
@@ -42,30 +42,30 @@ func serviceMonitorReconcile(canary *cdv1alpha1.Canary) error {
 	marshal, err := json.Marshal(&s)
 	if err != nil {
 		klog.Error(err)
-		return err
+		return
 	}
 	if err = json.Unmarshal(marshal, &utd.Object); err != nil {
 		klog.Error(err)
-		return err
+		return
 	}
-	namespaced := ClientSet.Resource(serviceMonitorGVR).Namespace(canary.Namespace)
+	namespaced := DClientSet.Resource(serviceMonitorGVR).Namespace(canary.Namespace)
 	get, _ := namespaced.Get(context.TODO(), canary.Name, metav1.GetOptions{})
 	if get == nil {
 		create, err := namespaced.Create(context.TODO(), utd, metav1.CreateOptions{})
 		if err != nil {
 			klog.Error(err)
-			return err
+			return
 		}
 		klog.Infof("Created monitoring %q.\n", create.GetName())
 	} else {
 		patch, err := namespaced.Patch(context.TODO(), s.Name, types.MergePatchType, marshal, metav1.PatchOptions{})
 		if err != nil {
 			klog.Error(err)
-			return err
+			return
 		}
 		klog.Infof("Patched Monitoring %q.\n", patch.GetName())
 	}
-	return nil
+	return
 }
 
 func getStartTime() {

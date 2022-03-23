@@ -50,18 +50,22 @@ type CanaryReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
-
 	canary := getCanary(&ctx, req.Namespace, req.Name)
-	err := deploymentReconcile(canary, req)
-	if err != nil {
-		return ctrl.Result{}, err
+	if canary == nil {
+		CanaryStoreInstance().del(canary.Namespace, canary.Name)
+	} else {
+		CanaryStoreInstance().apply(canary.Namespace, canary.Name, canary)
 	}
+	go deploymentReconcile(canary, req)
+	go serviceReconcile(canary, "")
+	go serviceMonitorReconcile(canary)
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *CanaryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	Init()
+	initInformers(context.Background())
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&cdv1alpha1.Canary{}).
 		Complete(r)

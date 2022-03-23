@@ -9,7 +9,7 @@ import (
 )
 
 func getCanary(ctx *context.Context, namespace string, name string) *cdv1alpha1.Canary {
-	list, err := ClientSet.Resource(canaryGVR).Namespace(namespace).Get(*ctx, name, metav1.GetOptions{})
+	list, err := DClientSet.Resource(canaryGVR).Namespace(namespace).Get(*ctx, name, metav1.GetOptions{})
 	if err != nil {
 		klog.Error(err)
 		return nil

@@ -6,59 +6,46 @@ import (
 	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sync"
 )
 
-var canaryGVR = schema.GroupVersionResource{
-	Group:    "cd.org.smart",
-	Version:  "v1alpha1",
-	Resource: "canaries",
-}
-var deployGVR = schema.GroupVersionResource{
-	Group:    "apps",
-	Version:  "v1",
-	Resource: "deployments",
-}
-var serviceGVR = schema.GroupVersionResource{
-	Group:    "",
-	Version:  "v1",
-	Resource: "services",
-}
-var serviceAccountGVR = schema.GroupVersionResource{
-	Group:    "",
-	Version:  "v1",
-	Resource: "serviceaccounts",
-}
-
-var serviceMonitorGVR = schema.GroupVersionResource{
-	Group:    "monitoring.coreos.com",
-	Version:  "v1",
-	Resource: "servicemonitors",
-}
-
-var ClientSet dynamic.Interface
+var KClientSet *kubernetes.Clientset
+var DClientSet dynamic.Interface
 var once sync.Once
 
 func Init() {
 	once.Do(func() {
-		ClientSet = initClientSet()
+		KClientSet = initClientSet()
+		DClientSet = initDClientSet()
 		pClient = initPrometheus()
 	})
 }
-func initClientSet() dynamic.Interface {
+func initClientSet() *kubernetes.Clientset {
 	cfg, err := config.GetConfig()
 	if err != nil {
 		panic(err)
 	}
-	clientset, err := dynamic.NewForConfig(cfg)
+	clientSet, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		panic(err)
 	}
-	return clientset
+	return clientSet
+}
+
+func initDClientSet() dynamic.Interface {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		panic(err)
+	}
+	clientSet, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		panic(err)
+	}
+	return clientSet
 }
 
 var pClient prometheusv1.API
