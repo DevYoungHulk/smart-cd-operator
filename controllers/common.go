@@ -40,3 +40,9 @@ const (
 const (
 	reSyncPeriod = 60 * time.Second
 )
+
+const (
+	Istio   string = "istio"
+	Traefik        = "traefik"
+	Nginx          = "nginx"
+)

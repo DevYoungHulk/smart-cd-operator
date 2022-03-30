@@ -57,8 +57,9 @@ func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		CanaryStoreInstance().apply(canary.Namespace, canary.Name, canary)
 	}
 	go deploymentReconcile(canary, req)
-	go serviceReconcile(canary, "")
+	go serviceReconcile(canary)
 	go serviceMonitorReconcile(canary)
+	go ingressReconcile(canary)
 	return ctrl.Result{}, nil
 }
 

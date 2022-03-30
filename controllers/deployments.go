@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	cdv1alpha1 "github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
@@ -18,7 +19,7 @@ func deploymentReconcile(canary *cdv1alpha1.Canary, req ctrl.Request) {
 		return
 		//return deleteDeployment(req.Namespace, req.Name)
 	}
-	if canary.Status.Running {
+	if canary.Status.Scaling {
 		klog.Infof("Last canary is running waiting finished.")
 		return
 	}
@@ -64,8 +65,12 @@ func applyDeployment(canary *cdv1alpha1.Canary, side string, targetReplicas *int
 		klog.Error(err)
 		return err
 	}
-	app, _ := namespaced.Get(context.TODO(), canary.Name+"--"+side, metav1.GetOptions{})
-	if app == nil {
+	app, err := namespaced.Get(context.TODO(), canary.Name+"--"+side, metav1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		klog.Error(err)
+		return err
+	}
+	if app == nil || app.Name == "" {
 		created, err1 := namespaced.Create(context.TODO(), deploy, metav1.CreateOptions{})
 		if err1 != nil {
 			klog.Error(err1)

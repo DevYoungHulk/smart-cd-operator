@@ -165,8 +165,13 @@ spec:
                     - type: integer
                     - type: string
                     x-kubernetes-int-or-string: true
-                  trafficWeight:
-                    type: string
+                  traffic:
+                    properties:
+                      type:
+                        type: string
+                      weight:
+                        type: string
+                    type: object
                   type:
                     description: Type of deployment. Can be "Recreate" or "RollingUpdate".
                       Default is RollingUpdate.
@@ -7243,7 +7248,9 @@ spec:
                   of cluster Important: Run "make" to regenerate code after modifying
                   this file'
                 x-kubernetes-int-or-string: true
-              running:
+              pause:
+                type: boolean
+              scaling:
                 type: boolean
               stableReplicasSize:
                 anyOf:

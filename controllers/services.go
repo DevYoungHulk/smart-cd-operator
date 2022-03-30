@@ -5,13 +5,19 @@ import (
 	"encoding/json"
 	cdv1alpha1 "github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 )
 
-func serviceReconcile(canary *cdv1alpha1.Canary, types string) {
-	createService(canary, "")
+func serviceReconcile(canary *cdv1alpha1.Canary) {
+	if canary.Spec.Strategy.Traffic.TType != Istio {
+		createService(canary, "canary")
+		createService(canary, "stable")
+	} else {
+		klog.Warning("istio support is building....")
+	}
 }
 func createService(canary *cdv1alpha1.Canary, side string) {
 	labels := canary.Spec.Selector.MatchLabels
@@ -35,9 +41,12 @@ func createService(canary *cdv1alpha1.Canary, side string) {
 	}
 
 	namespaced := KClientSet.CoreV1().Services(canary.Namespace)
-	get, _ := namespaced.Get(context.TODO(), s.Name, metav1.GetOptions{})
-
-	if get == nil {
+	get, err := namespaced.Get(context.TODO(), s.Name, metav1.GetOptions{})
+	if nil != err && !errors.IsNotFound(err) {
+		klog.Error(err)
+		return
+	}
+	if get == nil || get.Name == "" {
 		create, err := namespaced.Create(context.TODO(), &s, metav1.CreateOptions{})
 		if err != nil {
 			klog.Error(err)

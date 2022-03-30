@@ -86,8 +86,12 @@ type DeploymentStrategy struct {
 	RollingUpdate *appsv1.RollingUpdateDeployment `json:"rollingUpdate,omitempty" protobuf:"bytes,2,opt,name=rollingUpdate"`
 
 	PodWeight     string              `json:"podWeight,omitempty"`
-	TrafficWeight string              `json:"trafficWeight,omitempty"`
+	Traffic       Traffic             `json:"traffic,omitempty"`
 	ScaleInterval *intstr.IntOrString `json:"scaleTime,omitempty"`
+}
+type Traffic struct {
+	Weight string `json:"weight,omitempty"`
+	TType  string `json:"type,omitempty"`
 }
 
 type SmartPodTemplateSpec struct {
@@ -121,7 +125,8 @@ type CanaryStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 	CanaryReplicasSize *intstr.IntOrString `json:"canaryReplicasSize,omitempty"`
 	StableReplicasSize *intstr.IntOrString `json:"stableReplicasSize,omitempty"`
-	Running            bool                `json:"running,omitempty"`
+	Scaling            bool                `json:"scaling,omitempty"`
+	Pause              bool                `json:"pause,omitempty"`
 }
 
 //+kubebuilder:object:root=true

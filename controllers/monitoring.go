@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
-	"time"
 )
 
 func serviceMonitorReconcile(canary *cdv1alpha1.Canary) {
@@ -51,16 +50,16 @@ func serviceMonitorReconcile(canary *cdv1alpha1.Canary) {
 	namespaced := DClientSet.Resource(serviceMonitorGVR).Namespace(canary.Namespace)
 	get, _ := namespaced.Get(context.TODO(), canary.Name, metav1.GetOptions{})
 	if get == nil {
-		create, err := namespaced.Create(context.TODO(), utd, metav1.CreateOptions{})
-		if err != nil {
-			klog.Error(err)
+		create, err1 := namespaced.Create(context.TODO(), utd, metav1.CreateOptions{})
+		if err1 != nil {
+			klog.Error(err1)
 			return
 		}
 		klog.Infof("Created monitoring %q.\n", create.GetName())
 	} else {
-		patch, err := namespaced.Patch(context.TODO(), s.Name, types.MergePatchType, marshal, metav1.PatchOptions{})
-		if err != nil {
-			klog.Error(err)
+		patch, err1 := namespaced.Patch(context.TODO(), s.Name, types.MergePatchType, marshal, metav1.PatchOptions{})
+		if err1 != nil {
+			klog.Error(err1)
 			return
 		}
 		klog.Infof("Patched Monitoring %q.\n", patch.GetName())
@@ -69,16 +68,16 @@ func serviceMonitorReconcile(canary *cdv1alpha1.Canary) {
 }
 
 func getStartTime() {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	result, warnings, err := pClient.Query(
-		ctx,
-		"max(container_start_time_seconds{namespace=\"canary-sample\",name=~\".*my-nginx-app.*\"})",
-		time.Now(),
-	)
-	if err != nil {
-		klog.Errorf("Error querying Prometheus: %v\n", err)
-	} else {
-		klog.Infof("result -> %s , %v\n", result.String(), warnings)
-	}
+	//ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	//defer cancel()
+	//result, warnings, err := pClient.Query(
+	//	ctx,
+	//	"max(container_start_time_seconds{namespace=\"canary-sample\",name=~\".*my-nginx-app.*\"})",
+	//	time.Now(),
+	//)
+	//if err != nil {
+	//	klog.Errorf("Error querying Prometheus: %v\n", err)
+	//} else {
+	//	klog.Infof("result -> %s , %v\n", result.String(), warnings)
+	//}
 }

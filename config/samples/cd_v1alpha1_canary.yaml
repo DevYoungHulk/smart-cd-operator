@@ -7,7 +7,7 @@ spec:
   strategy:
     podWeight: "0.25"
     traffic:
-      type: istio # nginx istio traefik
+      type: nginx # nginx istio traefik
       weight: "0.25"
     type: RollingUpdate
     rollingUpdate:
