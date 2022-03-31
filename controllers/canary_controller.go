@@ -19,9 +19,11 @@ package controllers
 import (
 	"context"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"time"
 
 	cdv1alpha1 "github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1"
 )
@@ -53,13 +55,65 @@ func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	canary := getCanary(&ctx, req.Namespace, req.Name)
 	if canary == nil {
 		CanaryStoreInstance().del(canary.Namespace, canary.Name)
+		return ctrl.Result{}, nil
 	} else {
-		CanaryStoreInstance().apply(canary.Namespace, canary.Name, canary)
+		CanaryStoreInstance().apply(canary)
 	}
-	go deploymentReconcile(canary, req)
-	go serviceReconcile(canary)
-	go serviceMonitorReconcile(canary)
-	go ingressReconcile(canary)
+	stableDeploy, err := findStableDeployment(canary)
+	if err == nil && isSameWithStable(stableDeploy) {
+		klog.Info("same version with current stable version %s %s %s",
+			stableDeploy.Namespace,
+			stableDeploy.Name,
+			stableDeploy.Spec.Template.Spec.Containers[0].Name)
+		if stableDeploy.Spec.Replicas == canary.Spec.Replicas {
+			klog.Infof("Replicas also same. Nothing change for this canary. %s %s", canary.Namespace, canary.Name)
+			return ctrl.Result{}, nil
+		} else {
+			stableDeploy.Spec.Replicas = canary.Spec.Replicas
+			updateDeployment(*stableDeploy)
+			return ctrl.Result{}, nil
+		}
+	}
+	// stable version not exist.
+	if !canary.Status.Scaling {
+		canary.Status.Scaling = true
+		canary.Status.Finished = false
+		canary.Status.Pause = false
+		replicas := calcCanaryReplicas(canary)
+		canary.Status.StableTargetReplicasSize = *canary.Spec.Replicas
+		canary.Status.CanaryTargetReplicasSize = replicas
+		err1 := updateCanaryStatus(*canary)
+		return ctrl.Result{}, err1
+	}
+	klog.Infof("scaling")
+	canaryTargetSize := canary.Status.CanaryTargetReplicasSize
+	canarySize := canary.Status.CanaryReplicasSize
+	if canaryTargetSize > canarySize {
+		i := canarySize + 1
+		go func() {
+			val := canary.Spec.Strategy.ScaleInterval
+			if val == nil {
+				// default 10s ready
+				time.Sleep(time.Duration(10) * time.Second)
+			} else {
+				time.Sleep(time.Duration(val.IntVal) * time.Second)
+			}
+
+			err = applyDeployment(canary, Canary, &i)
+			if err != nil {
+				klog.Error("Scaling canary version error", err)
+			}
+		}()
+	} else if canaryTargetSize == canarySize {
+		klog.Infof("canary deployment is ready, setting network.")
+		//serviceReconcile(canary)
+		//ingressReconcile(canary)
+	}
+
+	//go deploymentReconcile(canary, req)
+	//go serviceReconcile(canary)
+	//go serviceMonitorReconcile(canary)
+	//go ingressReconcile(canary)
 	return ctrl.Result{}, nil
 }
 

@@ -123,10 +123,13 @@ type SmartObjectMeta struct {
 type CanaryStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	CanaryReplicasSize *intstr.IntOrString `json:"canaryReplicasSize,omitempty"`
-	StableReplicasSize *intstr.IntOrString `json:"stableReplicasSize,omitempty"`
-	Scaling            bool                `json:"scaling,omitempty"`
-	Pause              bool                `json:"pause,omitempty"`
+	CanaryTargetReplicasSize int32 `json:"canaryTargetReplicasSize,omitempty"`
+	CanaryReplicasSize       int32 `json:"canaryReplicasSize,omitempty"`
+	StableTargetReplicasSize int32 `json:"stableTargetReplicasSize,omitempty"`
+	StableReplicasSize       int32 `json:"stableReplicasSize,omitempty"`
+	Scaling                  bool  `json:"scaling,omitempty"`
+	Finished                 bool  `json:"finished,omitempty"`
+	Pause                    bool  `json:"pause,omitempty"`
 }
 
 //+kubebuilder:object:root=true

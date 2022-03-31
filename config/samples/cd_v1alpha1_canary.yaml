@@ -5,10 +5,10 @@ metadata:
   name: my-nginx-app
 spec:
   strategy:
-    podWeight: "0.25"
+    podWeight: "0.5"
     traffic:
       type: nginx # nginx istio traefik
-      weight: "0.25"
+      weight: "0.5"
     type: RollingUpdate
     rollingUpdate:
       maxSurge: "25%"

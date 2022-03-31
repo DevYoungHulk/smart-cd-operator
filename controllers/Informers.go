@@ -17,15 +17,26 @@ func initInformers(ctx context.Context) {
 	deployInformer := newInformer(namespace, "")
 	deployInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			name := obj.(*appsv1.Deployment).GetName()
-			klog.Infof("deployInformer AddFunc %v", name)
+			deployment := obj.(*appsv1.Deployment)
+			s := deployment.Spec.Selector.MatchLabels[Canary]
+			if len(s) == 0 {
+				return
+			}
+			updateCanaryStatusVals(deployment)
+			klog.Infof("deployInformer AddFunc %v", deployment.GetName())
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			oname := oldObj.(*appsv1.Deployment).GetName()
-			nname := newObj.(*appsv1.Deployment).GetName()
+			newDeployment := newObj.(*appsv1.Deployment)
+			s := newDeployment.Spec.Selector.MatchLabels[Canary]
+			if len(s) == 0 {
+				return
+			}
+			oldDeployment := oldObj.(*appsv1.Deployment)
+			oname := oldDeployment.GetName()
 			diff := cmp.Diff(oldObj, newObj)
 			if len(diff) > 0 {
-				klog.Infof("deployInformer UpdateFunc old-> %v, new -> %v %v", oname, nname, diff)
+				klog.Infof("deployInformer UpdateFunc  %s", oname)
+				updateCanaryStatusVals(newDeployment)
 			} else {
 				klog.Infof("deployInformer UpdateFunc nothing changed. name-> %v", oname)
 			}

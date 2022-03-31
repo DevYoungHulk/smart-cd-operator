@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"strconv"
 )
 
 func deploymentReconcile(canary *cdv1alpha1.Canary, req ctrl.Request) {
@@ -23,25 +22,28 @@ func deploymentReconcile(canary *cdv1alpha1.Canary, req ctrl.Request) {
 		klog.Infof("Last canary is running waiting finished.")
 		return
 	}
-	namespaced := KClientSet.AppsV1().Deployments(canary.Namespace)
-	stableDeploy, err := namespaced.Get(context.TODO(), canary.Name+"--"+Stable, metav1.GetOptions{})
-	if err == nil {
-		image := stableDeploy.Spec.Template.Spec.Containers[0].Image
-		if image == stableDeploy.Spec.Template.Spec.Containers[0].Image {
-			klog.Infof("Nothing will happen image not change [%s]", image)
-			return
-		}
+	stableDeploy, err := findStableDeployment(canary)
+	if err == nil && isSameWithStable(stableDeploy) {
+		return
 	}
-
-	replicas := *canary.Spec.Replicas
-	float, _ := strconv.ParseFloat(canary.Spec.Strategy.PodWeight, 64)
-	i := int32(float64(replicas) * float)
+	i := calcCanaryReplicas(canary)
 	// create canary version
 	err1 := applyDeployment(canary, Canary, &i)
 	if err1 != nil {
 		return
 	}
 	return
+}
+
+func isSameWithStable(stableDeploy *appsv1.Deployment) bool {
+	image := stableDeploy.Spec.Template.Spec.Containers[0].Image
+	return image == stableDeploy.Spec.Template.Spec.Containers[0].Image
+}
+
+func findStableDeployment(canary *cdv1alpha1.Canary) (*appsv1.Deployment, error) {
+	namespaced := KClientSet.AppsV1().Deployments(canary.Namespace)
+	stableDeploy, err := namespaced.Get(context.TODO(), canary.Name+"--"+Stable, metav1.GetOptions{})
+	return stableDeploy, err
 }
 
 func deleteDeployment(namespace string, name string) error {
@@ -55,12 +57,18 @@ func deleteDeployment(namespace string, name string) error {
 		return nil
 	}
 }
-
-func applyDeployment(canary *cdv1alpha1.Canary, side string, targetReplicas *int32) error {
+func updateDeployment(deployment appsv1.Deployment) {
+	namespaced := KClientSet.AppsV1().Deployments(deployment.Namespace)
+	_, err := namespaced.Update(context.TODO(), &deployment, metav1.UpdateOptions{})
+	if err != nil {
+		klog.Error("UpdateReplicas fail %s %s.", deployment.Namespace, deployment.Name)
+	}
+}
+func applyDeployment(canary *cdv1alpha1.Canary, side string, replicas *int32) error {
 	klog.Infof("Creating Or Updating deployment... namespace:%s name:%s\n", canary.Namespace, canary.Name)
 
 	namespaced := KClientSet.AppsV1().Deployments(canary.Namespace)
-	deploy, err := genDeployment(canary, Canary, targetReplicas)
+	deploy, err := genDeployment(canary, Canary, replicas)
 	if err != nil {
 		klog.Error(err)
 		return err

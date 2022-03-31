@@ -7241,22 +7241,26 @@ spec:
             description: CanaryStatus defines the observed state of Canary
             properties:
               canaryReplicasSize:
-                anyOf:
-                - type: integer
-                - type: string
+                format: int32
+                type: integer
+              canaryTargetReplicasSize:
                 description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
                   of cluster Important: Run "make" to regenerate code after modifying
                   this file'
-                x-kubernetes-int-or-string: true
+                format: int32
+                type: integer
+              finished:
+                type: boolean
               pause:
                 type: boolean
               scaling:
                 type: boolean
               stableReplicasSize:
-                anyOf:
-                - type: integer
-                - type: string
-                x-kubernetes-int-or-string: true
+                format: int32
+                type: integer
+              stableTargetReplicasSize:
+                format: int32
+                type: integer
             type: object
         type: object
     served: true
