@@ -8,18 +8,19 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
+	"strconv"
 )
 
-func ingressReconcile(canary *cdv1alpha1.Canary) {
+func ingressReconcile(canary *cdv1alpha1.Canary, canaryWeight float64) {
 	if canary.Spec.Strategy.Traffic.TType == Nginx {
-		genIngress(canary, Stable)
-		genIngress(canary, Canary)
+		genIngress(canary, Stable, 1-canaryWeight)
+		genIngress(canary, Canary, canaryWeight)
 	} else {
 		klog.Warning("istio & traefik support is building....")
 	}
 }
 
-func genIngress(canary *v1alpha1.Canary, side string) {
+func genIngress(canary *v1alpha1.Canary, side string, weight float64) {
 	var pathPrefix = v1.PathTypePrefix
 	i := v1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -61,7 +62,9 @@ func genIngress(canary *v1alpha1.Canary, side string) {
 			i.ObjectMeta.Annotations["nginx.ingress.kubernetes.io/canary"] = "true"
 			//float, _ := strconv.ParseFloat(canary.Spec.Strategy.Traffic.Weight, 64)
 			//weight := strconv.Itoa(int(float * 100))
-			i.ObjectMeta.Annotations["nginx.ingress.kubernetes.io/canary-weight"] = "0"
+			if side == Canary {
+				i.ObjectMeta.Annotations["nginx.ingress.kubernetes.io/canary-weight"] = strconv.Itoa(int(weight * 100))
+			}
 		}
 	}
 	namespaced := KClientSet.NetworkingV1().Ingresses(canary.Namespace)

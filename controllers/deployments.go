@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	cdv1alpha1 "github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -23,7 +24,7 @@ func deploymentReconcile(canary *cdv1alpha1.Canary, req ctrl.Request) {
 		return
 	}
 	stableDeploy, err := findStableDeployment(canary)
-	if err == nil && isSameWithStable(stableDeploy) {
+	if err == nil && isSameWithStable(stableDeploy.Spec.Template.Spec.Containers, canary.Spec.Template.Spec.Containers) {
 		return
 	}
 	i := calcCanaryReplicas(canary)
@@ -35,9 +36,16 @@ func deploymentReconcile(canary *cdv1alpha1.Canary, req ctrl.Request) {
 	return
 }
 
-func isSameWithStable(stableDeploy *appsv1.Deployment) bool {
-	image := stableDeploy.Spec.Template.Spec.Containers[0].Image
-	return image == stableDeploy.Spec.Template.Spec.Containers[0].Image
+func isSameWithStable(containers1 []v1.Container, containers2 []v1.Container) bool {
+	if len(containers1) == len(containers2) {
+		for i := range containers1 {
+			if containers1[i].Image != containers2[i].Image {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 func findStableDeployment(canary *cdv1alpha1.Canary) (*appsv1.Deployment, error) {
@@ -68,7 +76,7 @@ func applyDeployment(canary *cdv1alpha1.Canary, side string, replicas *int32) er
 	klog.Infof("Creating Or Updating deployment... namespace:%s name:%s\n", canary.Namespace, canary.Name)
 
 	namespaced := KClientSet.AppsV1().Deployments(canary.Namespace)
-	deploy, err := genDeployment(canary, Canary, replicas)
+	deploy, err := genDeployment(canary, side, replicas)
 	if err != nil {
 		klog.Error(err)
 		return err

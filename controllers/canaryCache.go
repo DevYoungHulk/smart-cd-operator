@@ -21,7 +21,7 @@ type CanaryStore struct {
 var store = make(map[string]v1alpha1.Canary)
 var lock = sync.RWMutex{}
 
-func (c *CanaryStore) apply(canary *v1alpha1.Canary) {
+func (c *CanaryStore) update(canary *v1alpha1.Canary) {
 	lock.Lock()
 	defer lock.Unlock()
 	store[canary.Namespace+":"+canary.Name] = *canary

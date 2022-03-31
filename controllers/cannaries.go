@@ -8,6 +8,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
 	"strconv"
 	"strings"
@@ -59,20 +60,22 @@ func updateCanaryStatus(canary cdv1alpha1.Canary) error {
 func updateCanaryStatusVals(deployment *appsv1.Deployment) {
 	name := deployment.GetName()
 	namespace := deployment.Namespace
-	//filter := labels.Set(deployment.Spec.Selector.MatchLabels).String()
-	//list, err2 := KClientSet.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: filter})
-	//if err2 != nil {
-	//	return
-	//}
-	//if hasRestartPod(list) {
-	//	klog.Error("Some pod is restarted. Please check. Canary is stop.")
-	//	return
-	//}
+	filter := labels.Set(deployment.Spec.Selector.MatchLabels).String()
+	list, err2 := KClientSet.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: filter})
+	if err2 != nil {
+		return
+	}
 	readyReplicas := deployment.Status.ReadyReplicas
 	if strings.HasSuffix(name, "--"+Canary) {
 		replace := strings.Replace(name, "--"+Canary, "", 1)
 		canary := CanaryStoreInstance().get(namespace, replace)
 		canary.Status.CanaryReplicasSize = readyReplicas
+		if canary.Status.CanaryReplicasSize == 0 &&
+			canary.Status.CanaryTargetReplicasSize == 0 &&
+			canary.Status.StableTargetReplicasSize == canary.Status.StableReplicasSize {
+			canary.Status.Finished = true
+			canary.Status.Scaling = false
+		}
 		err := updateCanaryStatus(*canary)
 		if err != nil {
 			klog.Error("updateCanaryStatusVals Canary failed.", err)
@@ -80,7 +83,12 @@ func updateCanaryStatusVals(deployment *appsv1.Deployment) {
 	} else if strings.HasSuffix(name, "--"+Stable) {
 		replace := strings.Replace(name, "--"+Stable, "", 1)
 		canary := CanaryStoreInstance().get(namespace, replace)
-		canary.Status.StableReplicasSize = readyReplicas
+		canary.Status.StableReplicasSize = getStableReadyCount(list, canary)
+		notUpdatedSize := canary.Status.StableTargetReplicasSize - canary.Status.StableReplicasSize
+		if notUpdatedSize < canary.Status.CanaryTargetReplicasSize {
+			canary.Status.CanaryTargetReplicasSize = notUpdatedSize
+			updateCanaryStatus(*canary)
+		}
 		err := updateCanaryStatus(*canary)
 		if err != nil {
 			klog.Error("updateCanaryStatusVals Stable failed.", err)
@@ -98,16 +106,23 @@ func updateCanaryStatusVals(deployment *appsv1.Deployment) {
 
 }
 
-func hasRestartPod(list *v1.PodList) bool {
-	hasRestartPod := false
-	for _, p := range list.Items {
-		for _, c := range p.Status.ContainerStatuses {
-			if c.RestartCount > 0 {
-				hasRestartPod = true
-			}
+func getStableReadyCount(list *v1.PodList, canary *cdv1alpha1.Canary) int32 {
+	i := int32(0)
+	for _, pod := range list.Items {
+		if isSameWithStable(pod.Spec.Containers, canary.Spec.Template.Spec.Containers) &&
+			allContainerReady(pod.Status.ContainerStatuses) {
+			i++
 		}
 	}
-	return hasRestartPod
+	return i
+}
+func allContainerReady(s []v1.ContainerStatus) bool {
+	for _, i := range s {
+		if !i.Ready {
+			return false
+		}
+	}
+	return true
 }
 
 func calcCanaryReplicas(canary *cdv1alpha1.Canary) int32 {
