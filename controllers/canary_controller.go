@@ -114,12 +114,14 @@ func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if canaryTargetSize > canarySize {
 		i := canarySize + 1
 		go func() {
-			val := canary.Spec.Strategy.ScaleInterval
-			if val == nil {
-				// default 10s ready
-				time.Sleep(time.Duration(10) * time.Second)
-			} else {
-				time.Sleep(time.Duration(val.IntVal) * time.Second)
+			if i != 1 {
+				val := canary.Spec.Strategy.ScaleInterval
+				if val == nil {
+					// default 10s ready
+					time.Sleep(time.Duration(10) * time.Second)
+				} else {
+					time.Sleep(time.Duration(val.IntVal) * time.Second)
+				}
 			}
 
 			err = applyDeployment(canary, Canary, &i)
