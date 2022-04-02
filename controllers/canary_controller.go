@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
@@ -56,25 +57,30 @@ type CanaryReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
-	canary := getCanary(&ctx, req.Namespace, req.Name)
-	if canary == nil {
-		CanaryStoreInstance().del(req.Namespace, req.Name)
-		return ctrl.Result{}, nil
-	} else {
-		oldCanary := CanaryStoreInstance().get(req.Namespace, req.Name)
-		if oldCanary != nil {
-			diff := cmp.Diff(oldCanary.Spec, canary.Spec)
-			if len(diff) > 0 {
-				//canary.Status.Finished = false
-				klog.Infof("canary spec is changed -> %s", diff)
-			}
-			diff2 := cmp.Diff(oldCanary.Status, canary.Status)
-			if len(diff2) > 0 {
-				klog.Infof("canary status is changed -> %s", diff2)
-			}
+	canary := &cdv1alpha1.Canary{}
+	err2 := r.Client.Get(ctx, req.NamespacedName, canary)
+	if err2 != nil {
+		if errors.IsNotFound(err2) {
+			CanaryStoreInstance().del(req.Namespace, req.Name)
+			return ctrl.Result{}, nil
+		} else {
+			return ctrl.Result{}, err2
 		}
-		CanaryStoreInstance().update(canary)
 	}
+	//canary := getCanary(&ctx, req.Namespace, req.Name)
+	oldCanary := CanaryStoreInstance().get(req.Namespace, req.Name)
+	if oldCanary != nil {
+		diff := cmp.Diff(oldCanary.Spec, canary.Spec)
+		if len(diff) > 0 {
+			//canary.Status.Finished = false
+			klog.Infof("canary spec is changed -> %s", diff)
+		}
+		diff2 := cmp.Diff(oldCanary.Status, canary.Status)
+		if len(diff2) > 0 {
+			klog.Infof("canary status is changed -> %s", diff2)
+		}
+	}
+	CanaryStoreInstance().update(canary)
 
 	stableDeploy, err := findStableDeployment(canary)
 	if err == nil && isSameWithStable(stableDeploy.Spec.Template.Spec.Containers, canary.Spec.Template.Spec.Containers) {

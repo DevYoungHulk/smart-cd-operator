@@ -84,14 +84,16 @@ type DeploymentStrategy struct {
 	// to be.
 	// +optional
 	RollingUpdate *appsv1.RollingUpdateDeployment `json:"rollingUpdate,omitempty" protobuf:"bytes,2,opt,name=rollingUpdate"`
-
+	// +kubebuilder:validation:Pattern:=`^(0(\.\d{1,2})?|1(\.0{1,2})?)$`
 	PodWeight     string              `json:"podWeight,omitempty"`
 	Traffic       Traffic             `json:"traffic,omitempty"`
 	ScaleInterval *intstr.IntOrString `json:"scaleTime,omitempty"`
 }
 type Traffic struct {
+	// +kubebuilder:validation:Pattern:=`^(0(\.\d{1,2})?|1(\.0{1,2})?)$`
 	Weight string `json:"weight,omitempty"`
-	TType  string `json:"type,omitempty"`
+	// +kubebuilder:validation:Enum:=istio;nginx;traefik
+	TType string `json:"type,omitempty"`
 }
 
 type SmartPodTemplateSpec struct {

@@ -120,6 +120,7 @@ spec:
                   with new ones.
                 properties:
                   podWeight:
+                    pattern: ^(0(\.\d{1,2})?|1(\.0{1,2})?)$
                     type: string
                   rollingUpdate:
                     description: 'Rolling update config params. Present only if DeploymentStrategyType
@@ -168,8 +169,13 @@ spec:
                   traffic:
                     properties:
                       type:
+                        enum:
+                        - istio
+                        - nginx
+                        - traefik
                         type: string
                       weight:
+                        pattern: ^(0(\.\d{1,2})?|1(\.0{1,2})?)$
                         type: string
                     type: object
                   type:
