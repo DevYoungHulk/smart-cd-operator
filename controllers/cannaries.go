@@ -20,14 +20,14 @@ import (
 	"time"
 )
 
-func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler) (ctrl.Result, error, bool) {
+func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler) error {
 	canary := &cdv1alpha1.Canary{}
 	c, err2 := getCanaryByNamespacedName(r, &ctx, req.NamespacedName)
 	if err2 != nil {
-		return ctrl.Result{}, err2, true
+		return err2
 	} else if c != nil {
 		CanaryStoreInstance().del(req.Namespace, req.Name)
-		return ctrl.Result{}, nil, true
+		return nil
 	} else {
 		//canary := getCanary(&ctx, req.Namespace, req.Name)
 		oldCanary := CanaryStoreInstance().get(req.Namespace, req.Name)
@@ -57,11 +57,11 @@ func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler)
 				ingressReconcile(canary, 0)
 				applyDeployment(canary, Canary, &canary.Status.CanaryTargetReplicasSize)
 			}
-			return ctrl.Result{}, nil, true
+			return nil
 		} else {
 			stableDeploy.Spec.Replicas = canary.Spec.Replicas
 			updateDeployment(*stableDeploy)
-			return ctrl.Result{}, nil, true
+			return nil
 		}
 	}
 	// stable version not exist.
@@ -75,7 +75,7 @@ func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler)
 		canary.Status.StableTargetReplicasSize = *canary.Spec.Replicas
 		canary.Status.CanaryTargetReplicasSize = replicas
 		err1 := updateCanaryStatus(*canary)
-		return ctrl.Result{}, err1, true
+		return err1
 	}
 	klog.Infof("scaling")
 	canaryTargetSize := canary.Status.CanaryTargetReplicasSize
@@ -128,9 +128,8 @@ func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler)
 				go applyDeployment(canary, Stable, &canary.Status.StableTargetReplicasSize)
 			}
 		}()
-
 	}
-	return ctrl.Result{}, nil, false
+	return nil
 }
 
 func getCanary(client client.Client, ctx *context.Context, namespace string, name string) (*cdv1alpha1.Canary, error) {
