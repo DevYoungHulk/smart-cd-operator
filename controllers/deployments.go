@@ -29,10 +29,8 @@ func deploymentReconcile(canary *cdv1alpha1.Canary, req ctrl.Request) {
 	}
 	i := calcCanaryReplicas(canary)
 	// create canary version
-	err1 := applyDeployment(canary, Canary, &i)
-	if err1 != nil {
-		return
-	}
+	applyDeployment(canary, Canary, &i)
+
 	return
 }
 
@@ -72,25 +70,25 @@ func updateDeployment(deployment appsv1.Deployment) {
 		klog.Error("UpdateReplicas fail %s %s.", deployment.Namespace, deployment.Name)
 	}
 }
-func applyDeployment(canary *cdv1alpha1.Canary, side string, replicas *int32) error {
+func applyDeployment(canary *cdv1alpha1.Canary, side string, replicas *int32) {
 	klog.Infof("Creating Or Updating deployment... namespace:%s name:%s\n", canary.Namespace, canary.Name)
 
 	namespaced := KClientSet.AppsV1().Deployments(canary.Namespace)
 	deploy, err := genDeployment(canary, side, replicas)
 	if err != nil {
-		klog.Error(err)
-		return err
+		klog.Errorf("ApplyDeployment failed %v", err)
+		return
 	}
 	app, err := namespaced.Get(context.TODO(), canary.Name+"--"+side, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
-		klog.Error(err)
-		return err
+		klog.Errorf("ApplyDeployment failed %v", err)
+		return
 	}
 	if app == nil || app.Name == "" {
 		created, err1 := namespaced.Create(context.TODO(), deploy, metav1.CreateOptions{})
 		if err1 != nil {
-			klog.Error(err1)
-			return err1
+			klog.Errorf("ApplyDeployment failed %v", err1)
+			return
 		}
 		klog.Infof("Created deployment %q.\n", created.GetName())
 	} else {
@@ -98,12 +96,12 @@ func applyDeployment(canary *cdv1alpha1.Canary, side string, replicas *int32) er
 			Update(context.TODO(), deploy, metav1.UpdateOptions{})
 		if err1 != nil {
 			klog.Error(err1)
-			return err1
+			return
 		}
 		klog.Infof("Updated deployment %q.\n", updated.GetName())
 	}
 	getStartTime()
-	return nil
+	return
 }
 
 func genDeployment(canary *cdv1alpha1.Canary, side string, targetReplicas *int32) (*appsv1.Deployment, error) {

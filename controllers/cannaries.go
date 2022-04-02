@@ -4,35 +4,148 @@ import (
 	"context"
 	"encoding/json"
 	cdv1alpha1 "github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1"
+	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	errors2 "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
 	"strings"
+	"time"
 )
 
-func getCanary(ctx *context.Context, namespace string, name string) *cdv1alpha1.Canary {
-	list, err := DClientSet.Resource(canaryGVR).Namespace(namespace).Get(*ctx, name, metav1.GetOptions{})
+func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler) (ctrl.Result, error, bool) {
+	canary := &cdv1alpha1.Canary{}
+	c, err2 := getCanaryByNamespacedName(r, &ctx, req.NamespacedName)
+	if err2 != nil {
+		return ctrl.Result{}, err2, true
+	} else if c != nil {
+		CanaryStoreInstance().del(req.Namespace, req.Name)
+		return ctrl.Result{}, nil, true
+	} else {
+		//canary := getCanary(&ctx, req.Namespace, req.Name)
+		oldCanary := CanaryStoreInstance().get(req.Namespace, req.Name)
+		if oldCanary != nil {
+			diff := cmp.Diff(oldCanary.Spec, canary.Spec)
+			if len(diff) > 0 {
+				//canary.Status.Finished = false
+				klog.Infof("canary spec is changed -> %s", diff)
+			}
+			diff2 := cmp.Diff(oldCanary.Status, canary.Status)
+			if len(diff2) > 0 {
+				klog.Infof("canary status is changed -> %s", diff2)
+			}
+		}
+		CanaryStoreInstance().update(canary)
+	}
+
+	stableDeploy, err := findStableDeployment(canary)
+	if err == nil && isSameWithStable(stableDeploy.Spec.Template.Spec.Containers, canary.Spec.Template.Spec.Containers) {
+		klog.Info("same version with current stable version %s %s %s",
+			stableDeploy.Namespace,
+			stableDeploy.Name,
+			stableDeploy.Spec.Template.Spec.Containers[0].Name)
+		if *stableDeploy.Spec.Replicas == *canary.Spec.Replicas {
+			klog.Infof("Replicas also same. Nothing change for this canary. %s %s", canary.Namespace, canary.Name)
+			if canary.Status.CanaryReplicasSize != canary.Status.CanaryTargetReplicasSize {
+				ingressReconcile(canary, 0)
+				applyDeployment(canary, Canary, &canary.Status.CanaryTargetReplicasSize)
+			}
+			return ctrl.Result{}, nil, true
+		} else {
+			stableDeploy.Spec.Replicas = canary.Spec.Replicas
+			updateDeployment(*stableDeploy)
+			return ctrl.Result{}, nil, true
+		}
+	}
+	// stable version not exist.
+	if !canary.Status.Scaling {
+		canary.Status.Scaling = true
+		canary.Status.Finished = false
+		canary.Status.Pause = false
+		canary.Status.CanaryReplicasSize = 0
+		canary.Status.StableReplicasSize = 0
+		replicas := calcCanaryReplicas(canary)
+		canary.Status.StableTargetReplicasSize = *canary.Spec.Replicas
+		canary.Status.CanaryTargetReplicasSize = replicas
+		err1 := updateCanaryStatus(*canary)
+		return ctrl.Result{}, err1, true
+	}
+	klog.Infof("scaling")
+	canaryTargetSize := canary.Status.CanaryTargetReplicasSize
+	canarySize := canary.Status.CanaryReplicasSize
+	if canaryTargetSize > canarySize {
+		i := canarySize + 1
+		go func() {
+			if i != 1 {
+				val := canary.Spec.Strategy.ScaleInterval
+				if val == nil {
+					// default 10s ready
+					time.Sleep(time.Duration(10) * time.Second)
+				} else {
+					time.Sleep(time.Duration(val.IntVal) * time.Second)
+				}
+			}
+			go applyDeployment(canary, Canary, &i)
+		}()
+	} else {
+		go func() {
+			val := canary.Spec.Strategy.ScaleInterval
+			if val == nil {
+				// default 10s ready
+				time.Sleep(time.Duration(10) * time.Second)
+			} else {
+				time.Sleep(time.Duration(val.IntVal) * time.Second)
+			}
+			klog.Infof("canary deployment is ready, setting network.")
+
+			serviceReconcile(canary)
+			stableReplicasSize := canary.Status.StableReplicasSize
+			if stableReplicasSize == 0 {
+				go ingressReconcile(canary, 1)
+				go applyDeployment(canary, Stable, &canary.Status.StableTargetReplicasSize)
+				return
+			}
+			//canaryReplicasSize := canary.Status.CanaryReplicasSize
+			//canaryWeight := float64(canaryReplicasSize)/float64(stableReplicasSize) + float64(canaryReplicasSize)
+			//if canaryWeight > float {
+			//	canaryWeight = float
+			//}
+			if canary.Status.CanaryReplicasSize != canary.Status.CanaryTargetReplicasSize {
+				if canary.Status.CanaryTargetReplicasSize == 0 {
+					go ingressReconcile(canary, 0)
+				}
+				go applyDeployment(canary, Canary, &canary.Status.CanaryTargetReplicasSize)
+			} else {
+				float, _ := strconv.ParseFloat(canary.Spec.Strategy.Traffic.Weight, 64)
+				ingressReconcile(canary, float)
+				go applyDeployment(canary, Stable, &canary.Status.StableTargetReplicasSize)
+			}
+		}()
+
+	}
+	return ctrl.Result{}, nil, false
+}
+
+func getCanary(client client.Client, ctx *context.Context, namespace string, name string) (*cdv1alpha1.Canary, error) {
+	return getCanaryByNamespacedName(client, ctx, types.NamespacedName{Namespace: namespace, Name: name})
+}
+func getCanaryByNamespacedName(client client.Client, ctx *context.Context, namespacedName client.ObjectKey) (*cdv1alpha1.Canary, error) {
+	canary := &cdv1alpha1.Canary{}
+	err := client.Get(*ctx, namespacedName, canary)
 	if err != nil {
-		klog.Error(err)
-		return nil
+		if errors2.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
 	}
-	data, err := list.MarshalJSON()
-	if err != nil {
-		klog.Error(err)
-		return nil
-	}
-	var canary cdv1alpha1.Canary
-	if err = json.Unmarshal(data, &canary); err != nil {
-		klog.Error(err)
-		return nil
-	}
-	canary.Kind = Canary
-	canary.APIVersion = canaryGVR.Group + "/" + canaryGVR.Version
-	return &canary
+	return canary, nil
 }
 
 func updateCanaryStatus(canary cdv1alpha1.Canary) error {

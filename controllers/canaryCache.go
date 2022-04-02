@@ -18,23 +18,30 @@ func CanaryStoreInstance() *CanaryStore {
 type CanaryStore struct {
 }
 
+const (
+	Separator = '/'
+)
+
 var store = make(map[string]v1alpha1.Canary)
 var lock = sync.RWMutex{}
 
 func (c *CanaryStore) update(canary *v1alpha1.Canary) {
 	lock.Lock()
 	defer lock.Unlock()
-	store[canary.Namespace+":"+canary.Name] = *canary
+	store[genKey(canary.Namespace, canary.Name)] = *canary
 }
 
 func (c *CanaryStore) del(namespace string, name string) {
 	lock.Lock()
 	defer lock.Unlock()
-	delete(store, namespace+":"+name)
+	delete(store, genKey(namespace, name))
 }
 
 func (c *CanaryStore) get(namespace string, name string) *v1alpha1.Canary {
-	canary := store[namespace+":"+name]
+	canary := store[genKey(namespace, name)]
 	deepCopy := canary.DeepCopy()
 	return deepCopy
+}
+func genKey(namespace string, name string) string {
+	return namespace + string(Separator) + name
 }
