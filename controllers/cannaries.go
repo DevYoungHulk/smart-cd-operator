@@ -39,6 +39,14 @@ func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler)
 			CanaryStoreInstance().update(canary)
 		}
 	}
+	if canary.Spec.Paused {
+		klog.Infof("Canary %s %s is paused.", canary.Namespace, canary.Name)
+		return nil
+	}
+	if canary.Status.Finished {
+		klog.Infof("Canary %s %s is finished.", canary.Namespace, canary.Name)
+		return nil
+	}
 
 	stableDeploy, err := findStableDeployment(ctx, r.Client, canary)
 	if err == nil && isSameWithStable(stableDeploy.Spec.Template.Spec.Containers, canary.Spec.Template.Spec.Containers) {
@@ -63,7 +71,6 @@ func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler)
 	if !canary.Status.Scaling {
 		canary.Status.Scaling = true
 		canary.Status.Finished = false
-		canary.Status.Pause = false
 		canary.Status.CanaryReplicasSize = 0
 		canary.Status.StableReplicasSize = 0
 		replicas := calcCanaryReplicas(canary)
@@ -118,8 +125,23 @@ func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler)
 				}
 				go applyDeployment(ctx, r.Client, canary, Canary, &canary.Status.CanaryTargetReplicasSize)
 			} else {
-				float, _ := strconv.ParseFloat(canary.Spec.Strategy.Traffic.Weight, 64)
-				ingressReconcile(ctx, r.Client, canary, float)
+				podWeight, err := strconv.ParseFloat(canary.Spec.Strategy.PodWeight, 64)
+				if err != nil {
+					klog.Error("Pod Weight parse error, %s", canary.Spec.Strategy.PodWeight)
+				}
+				canaryMaxReplicas := int32(podWeight * float64(*canary.Spec.Replicas))
+				if canary.Status.CanaryReplicasSize >= canaryMaxReplicas {
+					podWeight = 1
+				} else {
+					podWeight = float64(canary.Status.CanaryReplicasSize) / float64(canaryMaxReplicas)
+				}
+				trafficWeight, err := strconv.ParseFloat(canary.Spec.Strategy.Traffic.Weight, 64)
+				if err != nil {
+					klog.Error("Traffic Weight parse error, %s", canary.Spec.Strategy.Traffic.Weight)
+					trafficWeight = 0
+				}
+				formatFloat, _ := FormatFloat(trafficWeight*podWeight, 2)
+				ingressReconcile(ctx, r.Client, canary, formatFloat)
 				go applyDeployment(ctx, r.Client, canary, Stable, &canary.Status.StableTargetReplicasSize)
 			}
 		}()

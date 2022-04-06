@@ -131,7 +131,6 @@ type CanaryStatus struct {
 	StableReplicasSize       int32 `json:"stableReplicasSize,omitempty"`
 	Scaling                  bool  `json:"scaling,omitempty"`
 	Finished                 bool  `json:"finished,omitempty"`
-	Pause                    bool  `json:"pause,omitempty"`
 }
 
 //+kubebuilder:object:root=true
