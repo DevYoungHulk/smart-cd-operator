@@ -19,27 +19,25 @@ import (
 
 func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler) error {
 	canary := &cdv1alpha1.Canary{}
-	c, err2 := getCanaryByNamespacedName(ctx, r.Client, req.NamespacedName)
-	if err2 != nil {
-		return err2
-	} else if c != nil {
+	err2 := getCanaryByNamespacedName(ctx, r.Client, req.NamespacedName, canary)
+	if errors2.IsNotFound(err2) {
 		CanaryStoreInstance().del(req.Namespace, req.Name)
 		return nil
+	} else if err2 != nil {
+		return err2
 	} else {
-		//canary := getCanary(&ctx, req.Namespace, req.Name)
 		oldCanary := CanaryStoreInstance().get(req.Namespace, req.Name)
 		if oldCanary != nil {
 			diff := cmp.Diff(oldCanary.Spec, canary.Spec)
-			if len(diff) > 0 {
-				//canary.Status.Finished = false
-				klog.Infof("canary spec is changed -> %s", diff)
-			}
 			diff2 := cmp.Diff(oldCanary.Status, canary.Status)
-			if len(diff2) > 0 {
-				klog.Infof("canary status is changed -> %s", diff2)
+			if len(diff) > 0 || len(diff2) > 0 {
+				//canary.Status.Finished = false
+				klog.Infof("canary spec is changed -> spec %v, status %v", len(diff) > 0, len(diff2) > 0)
+				CanaryStoreInstance().update(canary)
 			}
+		} else {
+			CanaryStoreInstance().update(canary)
 		}
-		CanaryStoreInstance().update(canary)
 	}
 
 	stableDeploy, err := findStableDeployment(ctx, r.Client, canary)
@@ -51,7 +49,7 @@ func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler)
 		if *stableDeploy.Spec.Replicas == *canary.Spec.Replicas {
 			klog.Infof("Replicas also same. Nothing change for this canary. %s %s", canary.Namespace, canary.Name)
 			if canary.Status.CanaryReplicasSize != canary.Status.CanaryTargetReplicasSize {
-				ingressReconcile(canary, 0)
+				ingressReconcile(ctx, r.Client, canary, 0)
 				applyDeployment(ctx, r.Client, canary, Canary, &canary.Status.CanaryTargetReplicasSize)
 			}
 			return nil
@@ -105,7 +103,7 @@ func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler)
 			serviceReconcile(ctx, r.Client, canary)
 			stableReplicasSize := canary.Status.StableReplicasSize
 			if stableReplicasSize == 0 {
-				go ingressReconcile(canary, 1)
+				go ingressReconcile(ctx, r.Client, canary, 1)
 				go applyDeployment(ctx, r.Client, canary, Stable, &canary.Status.StableTargetReplicasSize)
 				return
 			}
@@ -116,12 +114,12 @@ func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler)
 			//}
 			if canary.Status.CanaryReplicasSize != canary.Status.CanaryTargetReplicasSize {
 				if canary.Status.CanaryTargetReplicasSize == 0 {
-					go ingressReconcile(canary, 0)
+					go ingressReconcile(ctx, r.Client, canary, 0)
 				}
 				go applyDeployment(ctx, r.Client, canary, Canary, &canary.Status.CanaryTargetReplicasSize)
 			} else {
 				float, _ := strconv.ParseFloat(canary.Spec.Strategy.Traffic.Weight, 64)
-				ingressReconcile(canary, float)
+				ingressReconcile(ctx, r.Client, canary, float)
 				go applyDeployment(ctx, r.Client, canary, Stable, &canary.Status.StableTargetReplicasSize)
 			}
 		}()
@@ -129,19 +127,11 @@ func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler)
 	return nil
 }
 
-func getCanary(ctx context.Context, client client.Client, namespace string, name string) (*cdv1alpha1.Canary, error) {
-	return getCanaryByNamespacedName(ctx, client, types.NamespacedName{Namespace: namespace, Name: name})
+func getCanary(ctx context.Context, client client.Client, namespace string, name string, canary *cdv1alpha1.Canary) error {
+	return getCanaryByNamespacedName(ctx, client, types.NamespacedName{Namespace: namespace, Name: name}, canary)
 }
-func getCanaryByNamespacedName(ctx context.Context, client client.Client, namespacedName client.ObjectKey) (*cdv1alpha1.Canary, error) {
-	canary := &cdv1alpha1.Canary{}
-	err := client.Get(ctx, namespacedName, canary)
-	if err != nil {
-		if errors2.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return canary, nil
+func getCanaryByNamespacedName(ctx context.Context, client client.Client, namespacedName client.ObjectKey, canary *cdv1alpha1.Canary) error {
+	return client.Get(ctx, namespacedName, canary)
 }
 
 func updateCanaryStatus(ctx context.Context, client client.Client, canary cdv1alpha1.Canary) error {

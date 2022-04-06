@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	cdv1alpha1 "github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -48,14 +47,14 @@ func createService(ctx context.Context, c client.Client, canary *cdv1alpha1.Cana
 		klog.Error(err)
 		return
 	}
-	if get == nil || get.Name == "" {
+	if errors.IsNotFound(err) {
 		err1 := c.Create(ctx, &s)
 		if err1 != nil {
 			klog.Error(err1)
 			return
 		}
 		klog.Infof("Created svc %q.\n", s.GetName())
-	} else {
+	} else if err == nil {
 		err1 := c.Patch(ctx, &s, client.Apply)
 		if err1 != nil {
 			klog.Error(err1)
@@ -66,8 +65,8 @@ func createService(ctx context.Context, c client.Client, canary *cdv1alpha1.Cana
 	return
 }
 
-func createServiceAccount(canary *cdv1alpha1.Canary) error {
-	s := v1.ServiceAccount{
+func createServiceAccount(ctx context.Context, c client.Client, canary *cdv1alpha1.Canary) error {
+	s := &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      canary.Name,
 			Namespace: canary.Namespace,
@@ -77,27 +76,25 @@ func createServiceAccount(canary *cdv1alpha1.Canary) error {
 		},
 	}
 
-	namespaced := KClientSet.CoreV1().ServiceAccounts(canary.Namespace)
-	get, _ := namespaced.Get(context.TODO(), canary.Name, metav1.GetOptions{})
-	if get == nil {
-		create, err := namespaced.Create(context.TODO(), &s, metav1.CreateOptions{})
-		if err != nil {
-			klog.Error(err)
-			return err
+	name := types.NamespacedName{}
+	get := &v1.ServiceAccount{}
+	err := c.Get(ctx, name, get)
+	if errors.IsNotFound(err) {
+		err1 := c.Create(context.TODO(), s)
+		if err1 != nil {
+			klog.Error(err1)
+			return err1
 		}
-		klog.Infof("Created serviceAccount %q.\n", create.GetName())
+		klog.Infof("Created serviceAccount %q.\n", s.GetName())
+	} else if err == nil {
+		err1 := c.Patch(ctx, s, client.Apply)
+		if err1 != nil {
+			klog.Error(err1)
+			return err1
+		}
+		klog.Infof("Patched serviceAccount %q.\n", s.GetName())
 	} else {
-		marshal, err := json.Marshal(&s)
-		if err != nil {
-			klog.Error(err)
-			return err
-		}
-		patch, err := namespaced.Patch(context.TODO(), s.Name, types.MergePatchType, marshal, metav1.PatchOptions{})
-		if err != nil {
-			klog.Error(err)
-			return err
-		}
-		klog.Infof("Patched serviceAccount %q.\n", patch.GetName())
+		return err
 	}
 	return nil
 }

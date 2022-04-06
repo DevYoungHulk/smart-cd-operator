@@ -49,14 +49,13 @@ type CanaryReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
+	//return ctrl.Result{}, nil
 	return ctrl.Result{}, reconcileCanary(ctx, req, r)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *CanaryReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	Init()
-	initInformers(r.Client)
-	initCache(r.Client)
+	Init(r.Client)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&cdv1alpha1.Canary{}).
 		Complete(r)

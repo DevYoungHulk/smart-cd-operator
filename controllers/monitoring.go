@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	cdv1alpha1 "github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1"
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
+	errors2 "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -51,20 +52,22 @@ func serviceMonitorReconcile(ctx context.Context, c client.Client, canary *cdv1a
 	get := monitoringv1.ServiceMonitor{}
 	name := types.NamespacedName{Namespace: canary.Name, Name: canary.Namespace}
 	err = c.Get(ctx, name, &get)
-	if len(get.Name) == 0 {
+	if errors2.IsNotFound(err) {
 		err1 := c.Create(ctx, &s)
 		if err1 != nil {
 			klog.Error(err1)
 			return
 		}
 		klog.Infof("Created monitoring %q.\n", s.GetName())
-	} else {
+	} else if err == nil {
 		err1 := c.Patch(ctx, &s, client.Apply)
 		if err1 != nil {
 			klog.Error(err1)
 			return
 		}
 		klog.Infof("Patched Monitoring %q.\n", s.GetName())
+	} else {
+		klog.Errorf("monitoringv1.ServiceMonitor %v", err)
 	}
 	return
 }

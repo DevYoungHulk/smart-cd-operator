@@ -7,20 +7,22 @@ import (
 	v1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strconv"
 )
 
-func ingressReconcile(canary *cdv1alpha1.Canary, canaryWeight float64) {
+func ingressReconcile(ctx context.Context, c client.Client, canary *cdv1alpha1.Canary, canaryWeight float64) {
 	if canary.Spec.Strategy.Traffic.TType == Nginx {
-		genIngress(canary, Stable, 1-canaryWeight)
-		genIngress(canary, Canary, canaryWeight)
+		genIngress(ctx, c, canary, Stable, 1-canaryWeight)
+		genIngress(ctx, c, canary, Canary, canaryWeight)
 	} else {
 		klog.Warning("istio & traefik support is building....")
 	}
 }
 
-func genIngress(canary *v1alpha1.Canary, side string, weight float64) {
+func genIngress(ctx context.Context, c client.Client, canary *v1alpha1.Canary, side string, weight float64) {
 	var pathPrefix = v1.PathTypePrefix
 	i := v1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -67,14 +69,15 @@ func genIngress(canary *v1alpha1.Canary, side string, weight float64) {
 			}
 		}
 	}
-	namespaced := KClientSet.NetworkingV1().Ingresses(canary.Namespace)
-	get, err := namespaced.Get(context.TODO(), i.Name, metav1.GetOptions{})
+	name := types.NamespacedName{}
+	get := &v1.Ingress{}
+	err := c.Get(ctx, name, get)
 	if err != nil && !errors.IsNotFound(err) {
 		klog.Error(err)
 		return
 	}
 	if get == nil || get.Name == "" {
-		_, err1 := namespaced.Create(context.TODO(), &i, metav1.CreateOptions{})
+		err1 := c.Create(ctx, &i)
 		if err1 != nil {
 			klog.Errorf("Create ingress failed. %v", err)
 			return
@@ -82,9 +85,9 @@ func genIngress(canary *v1alpha1.Canary, side string, weight float64) {
 			klog.Infof("Create ingress success. %s %s", i.Name, i.Namespace)
 		}
 	} else {
-		update, err1 := namespaced.Update(context.TODO(), &i, metav1.UpdateOptions{})
+		err1 := c.Update(ctx, &i)
 		if err1 != nil {
-			klog.Errorf("Update ingress failed. %v", update)
+			klog.Errorf("Update ingress failed. %v", i)
 			return
 		} else {
 			klog.Infof("Update ingress success. %s %s", i.Name, i.Namespace)

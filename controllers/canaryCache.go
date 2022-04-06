@@ -1,10 +1,7 @@
 package controllers
 
 import (
-	"context"
-	"encoding/json"
 	"github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sync"
 )
 
@@ -41,30 +38,12 @@ func (c *CanaryStore) del(namespace string, name string) {
 }
 
 func (c *CanaryStore) get(namespace string, name string) *v1alpha1.Canary {
-	canary := store[genKey(namespace, name)]
-	deepCopy := canary.DeepCopy()
-	return deepCopy
+	if val, ok := store[genKey(namespace, name)]; ok {
+		return val.DeepCopy()
+	} else {
+		return nil
+	}
 }
 func genKey(namespace string, name string) string {
 	return namespace + string(Separator) + name
-}
-
-func initCache(c client.Client) {
-	canaryList := &v1alpha1.CanaryList{}
-	err := c.List(context.TODO(), canaryList, &client.ListOptions{})
-	if err != nil {
-		panic(err)
-	}
-	for _, item := range canaryList.Items {
-		marshal, err := json.Marshal(item)
-		if err != nil {
-			panic(err)
-		}
-		canary := v1alpha1.Canary{}
-		err1 := json.Unmarshal(marshal, &canary)
-		if err1 != nil {
-			panic(err1)
-		}
-		CanaryStoreInstance().update(&canary)
-	}
 }

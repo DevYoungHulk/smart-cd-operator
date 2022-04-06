@@ -54,9 +54,12 @@ func findStableDeployment(ctx context.Context, c client.Client, canary *cdv1alph
 	return stableDeploy, err
 }
 
-func deleteDeployment(namespace string, name string) error {
+func deleteDeployment(ctx context.Context, c client.Client, namespace string, name string) error {
 	klog.Infof("Deleting Deployment namespace:%s name:%s\n", namespace, name)
-	err := KClientSet.AppsV1().Deployments(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
+	deployment := &appsv1.Deployment{}
+	deployment.Namespace = namespace
+	deployment.Name = name
+	err := c.Delete(ctx, deployment)
 	if err != nil {
 		klog.Infof("Delete Deployment failed namespace:%s name:%s\n", namespace, name)
 		return err
@@ -82,19 +85,19 @@ func applyDeployment(ctx context.Context, c client.Client, canary *cdv1alpha1.Ca
 		klog.Errorf("ApplyDeployment failed %v", err)
 		return
 	}
-	deploy, err := genDeployment(canary, side, replicas)
-	if err != nil {
-		klog.Errorf("ApplyDeployment failed %v", err)
+	deploy, err2 := genDeployment(canary, side, replicas)
+	if err2 != nil {
+		klog.Errorf("ApplyDeployment failed %v", err2)
 		return
 	}
-	if app == nil || app.Name == "" {
+	if errors.IsNotFound(err) {
 		err1 := c.Create(ctx, deploy)
 		if err1 != nil {
 			klog.Errorf("ApplyDeployment failed %v", err1)
 			return
 		}
 		klog.Infof("Created deployment %q.\n", deploy.GetName())
-	} else {
+	} else if err == nil {
 		err1 := c.Update(ctx, deploy)
 		if err1 != nil {
 			klog.Error(err1)
