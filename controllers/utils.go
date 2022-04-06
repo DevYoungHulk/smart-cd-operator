@@ -6,7 +6,6 @@ import (
 	prometheusv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -14,14 +13,15 @@ import (
 )
 
 var KClientSet *kubernetes.Clientset
-var DClientSet dynamic.Interface
+var PClient prometheusv1.API
+
 var once sync.Once
 
 func Init() {
 	once.Do(func() {
 		KClientSet = initClientSet()
-		DClientSet = initDClientSet()
-		pClient = initPrometheus()
+
+		PClient = initPrometheus()
 	})
 }
 func initClientSet() *kubernetes.Clientset {
@@ -35,20 +35,6 @@ func initClientSet() *kubernetes.Clientset {
 	}
 	return clientSet
 }
-
-func initDClientSet() dynamic.Interface {
-	cfg, err := config.GetConfig()
-	if err != nil {
-		panic(err)
-	}
-	clientSet, err := dynamic.NewForConfig(cfg)
-	if err != nil {
-		panic(err)
-	}
-	return clientSet
-}
-
-var pClient prometheusv1.API
 
 func initPrometheus() prometheusv1.API {
 	client, err := api.NewClient(api.Config{

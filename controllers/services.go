@@ -9,17 +9,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func serviceReconcile(canary *cdv1alpha1.Canary) {
+func serviceReconcile(ctx context.Context, c client.Client, canary *cdv1alpha1.Canary) {
 	if canary.Spec.Strategy.Traffic.TType != Istio {
-		createService(canary, "canary")
-		createService(canary, "stable")
+		createService(ctx, c, canary, "canary")
+		createService(ctx, c, canary, "stable")
 	} else {
 		klog.Warning("istio support is building....")
 	}
 }
-func createService(canary *cdv1alpha1.Canary, side string) {
+func createService(ctx context.Context, c client.Client, canary *cdv1alpha1.Canary, side string) {
 	labels := canary.Spec.Selector.MatchLabels
 	labels[Canary] = side
 	s := v1.Service{
@@ -40,31 +41,27 @@ func createService(canary *cdv1alpha1.Canary, side string) {
 		},
 	}
 
-	namespaced := KClientSet.CoreV1().Services(canary.Namespace)
-	get, err := namespaced.Get(context.TODO(), s.Name, metav1.GetOptions{})
+	get := &v1.Service{}
+	name := types.NamespacedName{Namespace: canary.Namespace, Name: canary.Name}
+	err := c.Get(ctx, name, get)
 	if nil != err && !errors.IsNotFound(err) {
 		klog.Error(err)
 		return
 	}
 	if get == nil || get.Name == "" {
-		create, err := namespaced.Create(context.TODO(), &s, metav1.CreateOptions{})
-		if err != nil {
-			klog.Error(err)
+		err1 := c.Create(ctx, &s)
+		if err1 != nil {
+			klog.Error(err1)
 			return
 		}
-		klog.Infof("Created svc %q.\n", create.GetName())
+		klog.Infof("Created svc %q.\n", s.GetName())
 	} else {
-		marshal, err := json.Marshal(&s)
-		if err != nil {
-			klog.Error(err)
+		err1 := c.Patch(ctx, &s, client.Apply)
+		if err1 != nil {
+			klog.Error(err1)
 			return
 		}
-		patch, err := namespaced.Patch(context.TODO(), s.Name, types.MergePatchType, marshal, metav1.PatchOptions{})
-		if err != nil {
-			klog.Error(err)
-			return
-		}
-		klog.Infof("Patched svc %q.\n", patch.GetName())
+		klog.Infof("Patched svc %q.\n", s.GetName())
 	}
 	return
 }

@@ -9,11 +9,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
-	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func deploymentReconcile(canary *cdv1alpha1.Canary, req ctrl.Request) {
+func deploymentReconcile(ctx context.Context, c client.Client, canary *cdv1alpha1.Canary) {
 	if canary == nil {
 		klog.Info("Canary deleted, but deployment not effected. -> %s: %s", canary.Namespace, canary.Name)
 		return
@@ -23,13 +24,13 @@ func deploymentReconcile(canary *cdv1alpha1.Canary, req ctrl.Request) {
 		klog.Infof("Last canary is running waiting finished.")
 		return
 	}
-	stableDeploy, err := findStableDeployment(canary)
+	stableDeploy, err := findStableDeployment(ctx, c, canary)
 	if err == nil && isSameWithStable(stableDeploy.Spec.Template.Spec.Containers, canary.Spec.Template.Spec.Containers) {
 		return
 	}
 	i := calcCanaryReplicas(canary)
 	// create canary version
-	applyDeployment(canary, Canary, &i)
+	applyDeployment(ctx, c, canary, Canary, &i)
 
 	return
 }
@@ -46,9 +47,10 @@ func isSameWithStable(containers1 []v1.Container, containers2 []v1.Container) bo
 	return false
 }
 
-func findStableDeployment(canary *cdv1alpha1.Canary) (*appsv1.Deployment, error) {
-	namespaced := KClientSet.AppsV1().Deployments(canary.Namespace)
-	stableDeploy, err := namespaced.Get(context.TODO(), canary.Name+"--"+Stable, metav1.GetOptions{})
+func findStableDeployment(ctx context.Context, c client.Client, canary *cdv1alpha1.Canary) (*appsv1.Deployment, error) {
+	stableDeploy := &appsv1.Deployment{}
+	namespacedName := types.NamespacedName{Namespace: canary.Namespace, Name: canary.Name + "--" + Stable}
+	err := c.Get(ctx, namespacedName, stableDeploy)
 	return stableDeploy, err
 }
 
@@ -63,42 +65,42 @@ func deleteDeployment(namespace string, name string) error {
 		return nil
 	}
 }
-func updateDeployment(deployment appsv1.Deployment) {
-	namespaced := KClientSet.AppsV1().Deployments(deployment.Namespace)
-	_, err := namespaced.Update(context.TODO(), &deployment, metav1.UpdateOptions{})
+func updateDeployment(ctx context.Context, c client.Client, deployment *appsv1.Deployment) {
+	err := c.Update(ctx, deployment)
 	if err != nil {
 		klog.Error("UpdateReplicas fail %s %s.", deployment.Namespace, deployment.Name)
 	}
 }
-func applyDeployment(canary *cdv1alpha1.Canary, side string, replicas *int32) {
+func applyDeployment(ctx context.Context, c client.Client, canary *cdv1alpha1.Canary, side string, replicas *int32) {
 	klog.Infof("Creating Or Updating deployment... namespace:%s name:%s\n", canary.Namespace, canary.Name)
 
-	namespaced := KClientSet.AppsV1().Deployments(canary.Namespace)
+	//namespaced := KClientSet.AppsV1().Deployments(canary.Namespace)
+	app := &appsv1.Deployment{}
+	name := types.NamespacedName{Namespace: canary.Namespace, Name: canary.Name + "--" + side}
+	err := c.Get(ctx, name, app)
+	if err != nil && !errors.IsNotFound(err) {
+		klog.Errorf("ApplyDeployment failed %v", err)
+		return
+	}
 	deploy, err := genDeployment(canary, side, replicas)
 	if err != nil {
 		klog.Errorf("ApplyDeployment failed %v", err)
 		return
 	}
-	app, err := namespaced.Get(context.TODO(), canary.Name+"--"+side, metav1.GetOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		klog.Errorf("ApplyDeployment failed %v", err)
-		return
-	}
 	if app == nil || app.Name == "" {
-		created, err1 := namespaced.Create(context.TODO(), deploy, metav1.CreateOptions{})
+		err1 := c.Create(ctx, deploy)
 		if err1 != nil {
 			klog.Errorf("ApplyDeployment failed %v", err1)
 			return
 		}
-		klog.Infof("Created deployment %q.\n", created.GetName())
+		klog.Infof("Created deployment %q.\n", deploy.GetName())
 	} else {
-		updated, err1 := namespaced.
-			Update(context.TODO(), deploy, metav1.UpdateOptions{})
+		err1 := c.Update(ctx, deploy)
 		if err1 != nil {
 			klog.Error(err1)
 			return
 		}
-		klog.Infof("Updated deployment %q.\n", updated.GetName())
+		klog.Infof("Updated deployment %q.\n", deploy.GetName())
 	}
 	getStartTime()
 	return

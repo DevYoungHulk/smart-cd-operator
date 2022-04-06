@@ -9,9 +9,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func serviceMonitorReconcile(canary *cdv1alpha1.Canary) {
+func serviceMonitorReconcile(ctx context.Context, c client.Client, canary *cdv1alpha1.Canary) {
 	s := monitoringv1.ServiceMonitor{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ServiceMonitor",
@@ -47,22 +48,23 @@ func serviceMonitorReconcile(canary *cdv1alpha1.Canary) {
 		klog.Error(err)
 		return
 	}
-	namespaced := DClientSet.Resource(serviceMonitorGVR).Namespace(canary.Namespace)
-	get, _ := namespaced.Get(context.TODO(), canary.Name, metav1.GetOptions{})
-	if get == nil {
-		create, err1 := namespaced.Create(context.TODO(), utd, metav1.CreateOptions{})
+	get := monitoringv1.ServiceMonitor{}
+	name := types.NamespacedName{Namespace: canary.Name, Name: canary.Namespace}
+	err = c.Get(ctx, name, &get)
+	if len(get.Name) == 0 {
+		err1 := c.Create(ctx, &s)
 		if err1 != nil {
 			klog.Error(err1)
 			return
 		}
-		klog.Infof("Created monitoring %q.\n", create.GetName())
+		klog.Infof("Created monitoring %q.\n", s.GetName())
 	} else {
-		patch, err1 := namespaced.Patch(context.TODO(), s.Name, types.MergePatchType, marshal, metav1.PatchOptions{})
+		err1 := c.Patch(ctx, &s, client.Apply)
 		if err1 != nil {
 			klog.Error(err1)
 			return
 		}
-		klog.Infof("Patched Monitoring %q.\n", patch.GetName())
+		klog.Infof("Patched Monitoring %q.\n", s.GetName())
 	}
 	return
 }

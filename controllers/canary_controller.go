@@ -18,9 +18,7 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	cdv1alpha1 "github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -57,23 +55,8 @@ func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 // SetupWithManager sets up the controller with the Manager.
 func (r *CanaryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	Init()
-	initInformers(context.Background())
-	list, err := DClientSet.Resource(canaryGVR).Namespace("").List(context.TODO(), v1.ListOptions{})
-	if err != nil {
-		panic(err)
-	}
-	for _, item := range list.Items {
-		marshal, err := json.Marshal(item.Object)
-		if err != nil {
-			panic(err)
-		}
-		canary := cdv1alpha1.Canary{}
-		err1 := json.Unmarshal(marshal, &canary)
-		if err1 != nil {
-			panic(err1)
-		}
-		CanaryStoreInstance().update(&canary)
-	}
+	initInformers(r.Client)
+	initCache(r.Client)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&cdv1alpha1.Canary{}).
 		Complete(r)
