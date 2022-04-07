@@ -50,12 +50,11 @@ type CanaryReconciler struct {
 func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 	//return ctrl.Result{}, nil
-	return ctrl.Result{}, reconcileCanary(ctx, req, r)
+	return ctrl.Result{}, reconcileCanary(ctx, r, req)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *CanaryReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	Init(r.Client)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&cdv1alpha1.Canary{}).
 		Complete(r)

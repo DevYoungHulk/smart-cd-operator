@@ -1,5 +1,5 @@
 # Adds namespace to all resources.
-namespace: smart-cd-operator-system
+namespace: smart-cd-operator
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named

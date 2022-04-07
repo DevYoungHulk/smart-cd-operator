@@ -25,7 +25,7 @@ func deploymentReconcile(ctx context.Context, c client.Client, canary *cdv1alpha
 		return
 	}
 	stableDeploy, err := findStableDeployment(ctx, c, canary)
-	if err == nil && isSameWithStable(stableDeploy.Spec.Template.Spec.Containers, canary.Spec.Template.Spec.Containers) {
+	if err == nil && isSameContainers(stableDeploy.Spec.Template.Spec.Containers, canary.Spec.Template.Spec.Containers) {
 		return
 	}
 	i := calcCanaryReplicas(canary)
@@ -35,7 +35,7 @@ func deploymentReconcile(ctx context.Context, c client.Client, canary *cdv1alpha
 	return
 }
 
-func isSameWithStable(containers1 []v1.Container, containers2 []v1.Container) bool {
+func isSameContainers(containers1 []v1.Container, containers2 []v1.Container) bool {
 	if len(containers1) == len(containers2) {
 		for i := range containers1 {
 			if containers1[i].Image != containers2[i].Image {

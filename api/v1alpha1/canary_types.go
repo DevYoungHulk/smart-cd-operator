@@ -129,8 +129,8 @@ type CanaryStatus struct {
 	CanaryReplicasSize       int32 `json:"canaryReplicasSize,omitempty"`
 	StableTargetReplicasSize int32 `json:"stableTargetReplicasSize,omitempty"`
 	StableReplicasSize       int32 `json:"stableReplicasSize,omitempty"`
+	OldStableReplicasSize    int32 `json:"old_stable_replicas_size,omitempty"`
 	Scaling                  bool  `json:"scaling,omitempty"`
-	Finished                 bool  `json:"finished,omitempty"`
 }
 
 //+kubebuilder:object:root=true

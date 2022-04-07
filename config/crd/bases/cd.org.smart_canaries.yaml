@@ -7255,10 +7255,9 @@ spec:
                   this file'
                 format: int32
                 type: integer
-              finished:
-                type: boolean
-              pause:
-                type: boolean
+              old_stable_replicas_size:
+                format: int32
+                type: integer
               scaling:
                 type: boolean
               stableReplicasSize:

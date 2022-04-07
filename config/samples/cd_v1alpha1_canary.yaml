@@ -8,7 +8,7 @@ spec:
     podWeight: "0.5"
     traffic:
       type: nginx # nginx istio traefik
-      weight: "0.15"
+      weight: "0.25"
     type: RollingUpdate
     rollingUpdate:
       maxSurge: "25%"

@@ -23,7 +23,7 @@ var once sync.Once
 func Init(c client.Client) {
 	once.Do(func() {
 		KClientSet = initClientSet()
-		PClient = initPrometheus()
+		//PClient = initPrometheus()
 		initInformers(c)
 	})
 }
