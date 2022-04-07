@@ -17,6 +17,8 @@ import (
 	"time"
 )
 
+const defaultScaleInterval = time.Duration(30) * time.Second
+
 func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler) error {
 	canary := &cdv1alpha1.Canary{}
 	err2 := getCanaryByNamespacedName(ctx, r.Client, req.NamespacedName, canary)
@@ -68,7 +70,7 @@ func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler)
 		}
 	}
 	// stable version not exist.
-	if !canary.Status.Scaling {
+	if !canary.Status.Scaling && !canary.Status.Finished {
 		canary.Status.Scaling = true
 		canary.Status.Finished = false
 		canary.Status.CanaryReplicasSize = 0
@@ -89,7 +91,7 @@ func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler)
 				val := canary.Spec.Strategy.ScaleInterval
 				if val == nil {
 					// default 10s ready
-					time.Sleep(time.Duration(10) * time.Second)
+					time.Sleep(defaultScaleInterval)
 				} else {
 					time.Sleep(time.Duration(val.IntVal) * time.Second)
 				}
@@ -101,7 +103,7 @@ func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler)
 			val := canary.Spec.Strategy.ScaleInterval
 			if val == nil {
 				// default 10s ready
-				time.Sleep(time.Duration(10) * time.Second)
+				time.Sleep(defaultScaleInterval)
 			} else {
 				time.Sleep(time.Duration(val.IntVal) * time.Second)
 			}
@@ -114,6 +116,11 @@ func reconcileCanary(ctx context.Context, req ctrl.Request, r *CanaryReconciler)
 				go applyDeployment(ctx, r.Client, canary, Stable, &canary.Status.StableTargetReplicasSize)
 				return
 			}
+
+			// canary finished
+			//canary.Status.Finished = true
+			//_ = updateCanaryStatus(ctx, r.Client, *canary)
+
 			//canaryReplicasSize := canary.Status.CanaryReplicasSize
 			//canaryWeight := float64(canaryReplicasSize)/float64(stableReplicasSize) + float64(canaryReplicasSize)
 			//if canaryWeight > float {
