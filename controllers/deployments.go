@@ -98,7 +98,7 @@ func applyDeployment(ctx context.Context, c client.Client, canary *cdv1alpha1.Ca
 		}
 		klog.Infof("Created deployment %q.\n", deploy.GetName())
 	} else if err == nil {
-		err1 := c.Update(ctx, deploy)
+		err1 := c.Patch(ctx, deploy, client.Merge)
 		if err1 != nil {
 			klog.Error(err1)
 			return

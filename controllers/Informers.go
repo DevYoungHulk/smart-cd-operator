@@ -23,8 +23,16 @@ func initInformers(c client.Client) {
 			if len(s) == 0 {
 				return
 			}
-			updateCanaryStatusVales(ctx, c, pod)
-			klog.Infof("podInformer AddFunc %v", pod.GetName())
+			allReady := false
+			for _, i := range pod.Status.ContainerStatuses {
+				if !i.Ready {
+					allReady = true
+				}
+			}
+			if allReady {
+				updateCanaryStatusVales(ctx, c, pod)
+				klog.Infof("podInformer AddFunc %v", pod.GetName())
+			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newPod := newObj.(*v1.Pod)
@@ -36,7 +44,6 @@ func initInformers(c client.Client) {
 			oName := oldPod.GetName()
 			diff := cmp.Diff(oldPod.Status, newPod.Status) + cmp.Diff(oldPod.Spec, newPod.Spec)
 			if len(diff) > 0 {
-				klog.Infof("podInformer UpdateFunc  %s", oName)
 				allReady := false
 				for _, i := range newPod.Status.ContainerStatuses {
 					if !i.Ready {
@@ -44,6 +51,7 @@ func initInformers(c client.Client) {
 					}
 				}
 				if allReady {
+					klog.Infof("podInformer UpdateFunc  %s", oName)
 					updateCanaryStatusVales(ctx, c, newPod)
 				}
 			} else {
