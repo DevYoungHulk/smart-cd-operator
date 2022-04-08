@@ -44,13 +44,7 @@ func initInformers(c client.Client) {
 			oName := oldPod.GetName()
 			diff := cmp.Diff(oldPod.Status, newPod.Status) + cmp.Diff(oldPod.Spec, newPod.Spec)
 			if len(diff) > 0 {
-				allReady := false
-				for _, i := range newPod.Status.ContainerStatuses {
-					if !i.Ready {
-						allReady = true
-					}
-				}
-				if allReady {
+				if newPod.Status.Phase == v1.PodRunning {
 					klog.Infof("podInformer UpdateFunc  %s", oName)
 					updateCanaryStatusVales(ctx, c, newPod)
 				}

@@ -223,10 +223,11 @@ func updateCanaryStatusVales(ctx context.Context, c client.Client, pod *v1.Pod) 
 		return
 	}
 	var canary *cdv1alpha1.Canary
-	if !strings.Contains(podName, "--"+Canary) && !strings.Contains(podName, "--"+Stable) {
+	isCanary := strings.Contains(podName, "--canary")
+	isStable := strings.Contains(podName, "--stable")
+	if !isCanary && !isStable {
 		return
 	}
-	isCanary := strings.Contains(podName, "--"+Canary)
 	split := strings.Split(podName, "--")
 	canary = CanaryStoreInstance().get(namespace, split[0])
 	if canary == nil {
@@ -259,19 +260,11 @@ func getReadyPodsCount(list *v1.PodList, canary *cdv1alpha1.Canary) int32 {
 	i := int32(0)
 	for _, pod := range list.Items {
 		if isSameContainers(pod.Spec.Containers, canary.Spec.Template.Spec.Containers) &&
-			allContainerReady(pod.Status.ContainerStatuses) {
+			pod.Status.Phase == v1.PodRunning {
 			i++
 		}
 	}
 	return i
-}
-func allContainerReady(s []v1.ContainerStatus) bool {
-	for _, i := range s {
-		if !i.Ready {
-			return false
-		}
-	}
-	return true
 }
 
 func calcCanaryReplicas(canary *cdv1alpha1.Canary) int32 {
