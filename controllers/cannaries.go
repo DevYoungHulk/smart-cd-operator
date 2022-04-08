@@ -123,7 +123,8 @@ func reconcileCanary(ctx context.Context, r *CanaryReconciler, req ctrl.Request)
 				val := canary.Spec.Strategy.ScaleInterval
 				waitTime := defaultScaleInterval
 				if val != nil {
-					waitTime = time.Duration(val.IntVal) * time.Second
+					duration, _ := time.ParseDuration(val.StrVal)
+					waitTime = duration
 				}
 				klog.Infof("Sleeping... Waiting for scaling canary version, interval is %f s", waitTime.Seconds())
 				time.Sleep(waitTime)
@@ -135,7 +136,8 @@ func reconcileCanary(ctx context.Context, r *CanaryReconciler, req ctrl.Request)
 			val := canary.Spec.Strategy.ScaleInterval
 			waitTime := defaultScaleInterval
 			if val != nil {
-				waitTime = time.Duration(val.IntVal) * time.Second
+				duration, _ := time.ParseDuration(val.StrVal)
+				waitTime = duration
 			}
 			klog.Infof("Sleeping 2 ... Waiting for scaling stable version, interval is %f s", waitTime.Seconds())
 			time.Sleep(waitTime)
