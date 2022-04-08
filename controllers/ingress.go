@@ -69,9 +69,8 @@ func genIngress(ctx context.Context, c client.Client, canary *v1alpha1.Canary, s
 			}
 		}
 	}
-	name := types.NamespacedName{}
 	get := &v1.Ingress{}
-	err := c.Get(ctx, name, get)
+	err := c.Get(ctx, types.NamespacedName{Namespace: i.Namespace, Name: i.Name}, get)
 	if err != nil && !errors.IsNotFound(err) {
 		klog.Error(err)
 		return
