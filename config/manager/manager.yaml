@@ -24,8 +24,8 @@ spec:
       labels:
         control-plane: controller-manager
     spec:
-      securityContext:
-        runAsNonRoot: true
+#      securityContext:
+#        runAsNonRoot: false
       containers:
       - command:
         - /manager
@@ -33,8 +33,8 @@ spec:
         - --leader-elect
         image: registry.cn-hangzhou.aliyuncs.com/hulk-yang/controller:latest
         name: manager
-        securityContext:
-          allowPrivilegeEscalation: false
+#        securityContext:
+#          allowPrivilegeEscalation: false
         livenessProbe:
           httpGet:
             path: /healthz

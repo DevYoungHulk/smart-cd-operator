@@ -63,7 +63,7 @@ func (r *Canary) ValidateCreate() error {
 func (r *Canary) ValidateUpdate(old runtime.Object) error {
 	canarylog.Info("validate update", "name", r.Name)
 
-	if !r.Status.Scaling {
+	if r.Status.Scaling {
 		return errors.New("Canary is running. Please stop it first.")
 	}
 	return nil
