@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	cdv1alpha1 "github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1"
+	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -14,26 +15,26 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func deploymentReconcile(ctx context.Context, c client.Client, canary *cdv1alpha1.Canary) {
-	if canary == nil {
-		klog.Info("Canary deleted, but deployment not effected. -> %s: %s", canary.Namespace, canary.Name)
-		return
-		//return deleteDeployment(req.Namespace, req.Name)
-	}
-	if canary.Status.Scaling {
-		klog.Infof("Last canary is running waiting finished.")
-		return
-	}
-	stableDeploy, err := findStableDeployment(ctx, c, canary)
-	if err == nil && isSameContainers(stableDeploy.Spec.Template.Spec.Containers, canary.Spec.Template.Spec.Containers) {
-		return
-	}
-	i := calcCanaryReplicas(canary)
-	// create canary version
-	applyDeployment(ctx, c, canary, Canary, &i)
-
-	return
-}
+//func deploymentReconcile(ctx context.Context, c client.Client, canary *cdv1alpha1.Canary) {
+//	if canary == nil {
+//		klog.Info("Canary deleted, but deployment not effected. -> %s: %s", canary.Namespace, canary.Name)
+//		return
+//		//return deleteDeployment(req.Namespace, req.Name)
+//	}
+//	if canary.Status.Scaling {
+//		klog.Infof("Last canary is running waiting finished.")
+//		return
+//	}
+//	stableDeploy, err := findStableDeployment(ctx, c, canary)
+//	if err == nil && isSameContainers(stableDeploy.Spec.Template.Spec.Containers, canary.Spec.Template.Spec.Containers) {
+//		return
+//	}
+//	i := calcCanaryReplicas(canary)
+//	// create canary version
+//	applyDeployment(ctx, c, canary, Canary, &i)
+//
+//	return
+//}
 
 func isSameContainers(containers1 []v1.Container, containers2 []v1.Container) bool {
 	if len(containers1) == len(containers2) {
@@ -97,13 +98,15 @@ func applyDeployment(ctx context.Context, c client.Client, canary *cdv1alpha1.Ca
 			return
 		}
 		klog.Infof("Created deployment %q.\n", deploy.GetName())
-	} else if err == nil {
+	} else if err == nil && len(cmp.Diff(app.Spec, deploy.Spec)) > 0 {
 		err1 := c.Patch(ctx, deploy, client.Merge)
 		if err1 != nil {
 			klog.Error(err1)
 			return
 		}
 		klog.Infof("Updated deployment %q.\n", deploy.GetName())
+	} else {
+		klog.Infof("Deployment replicas not change.")
 	}
 	getStartTime()
 	return

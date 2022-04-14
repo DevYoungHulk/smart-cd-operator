@@ -21,6 +21,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"strconv"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -61,9 +62,9 @@ type CanarySpec struct {
 	// +optional
 	RevisionHistoryLimit *int32 `json:"revisionHistoryLimit,omitempty" protobuf:"varint,6,opt,name=revisionHistoryLimit"`
 
-	// Indicates that the deployment is paused.
-	// +optional
-	Paused bool `json:"paused,omitempty" protobuf:"varint,7,opt,name=paused"`
+	//// Indicates that the deployment is paused.
+	//// +optional
+	//Paused bool `json:"paused,omitempty" protobuf:"varint,7,opt,name=paused"`
 
 	// The maximum time in seconds for a deployment to make progress before it
 	// is considered to be failed. The deployment controller will continue to
@@ -125,12 +126,11 @@ type SmartObjectMeta struct {
 type CanaryStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	CanaryTargetReplicasSize int32 `json:"canaryTargetReplicasSize,omitempty"`
-	CanaryReplicasSize       int32 `json:"canaryReplicasSize,omitempty"`
-	StableTargetReplicasSize int32 `json:"stableTargetReplicasSize,omitempty"`
-	StableReplicasSize       int32 `json:"stableReplicasSize,omitempty"`
-	OldStableReplicasSize    int32 `json:"old_stable_replicas_size,omitempty"`
-	Scaling                  bool  `json:"scaling,omitempty"`
+	CanaryReplicasSize    int32  `json:"canaryReplicasSize,omitempty"`
+	StableReplicasSize    int32  `json:"stableReplicasSize,omitempty"`
+	OldStableReplicasSize int32  `json:"old_stable_replicas_size,omitempty"`
+	CanaryTraffic         string `json:"canary-traffic,omitempty"`
+	Scaling               bool   `json:"scaling,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -156,4 +156,14 @@ type CanaryList struct {
 
 func init() {
 	SchemeBuilder.Register(&Canary{}, &CanaryList{})
+}
+
+func (r *Canary) IsPaused() bool {
+	if val, exist := r.Annotations["smart.cd.canary/pause"]; !exist {
+		return false
+	} else if pause, err := strconv.ParseBool(val); err != nil || !pause {
+		return false
+	} else {
+		return true
+	}
 }

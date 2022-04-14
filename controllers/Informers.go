@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -11,6 +10,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	//"github.com/reactivex/rxgo/v2"
 )
 
 func initInformers(c client.Client) {
@@ -23,13 +23,8 @@ func initInformers(c client.Client) {
 			if len(s) == 0 {
 				return
 			}
-			allReady := false
-			for _, i := range pod.Status.ContainerStatuses {
-				if !i.Ready {
-					allReady = true
-				}
-			}
-			if allReady {
+
+			if pod.Status.Phase == v1.PodRunning {
 				updateCanaryStatusVales(ctx, c, pod)
 				klog.Infof("podInformer AddFunc %v", pod.GetName())
 			}
@@ -40,17 +35,17 @@ func initInformers(c client.Client) {
 			if len(s) == 0 {
 				return
 			}
-			oldPod := oldObj.(*v1.Pod)
-			oName := oldPod.GetName()
-			diff := cmp.Diff(oldPod.Status, newPod.Status) + cmp.Diff(oldPod.Spec, newPod.Spec)
-			if len(diff) > 0 {
-				if newPod.Status.Phase == v1.PodRunning {
-					klog.Infof("podInformer UpdateFunc  %s", oName)
-					updateCanaryStatusVales(ctx, c, newPod)
-				}
-			} else {
-				klog.Infof("podInformer UpdateFunc nothing changed. name-> %v", oName)
+			//oldPod := oldObj.(*v1.Pod)
+			//oName := oldPod.GetName()
+			//diff := cmp.Diff(oldPod.Status, newPod.Status) + cmp.Diff(oldPod.Spec, newPod.Spec)
+			//if len(diff) > 0 {
+			if newPod.Status.Phase == v1.PodRunning {
+				klog.Infof("podInformer UpdateFunc  %s", newPod.Name)
+				updateCanaryStatusVales(ctx, c, newPod)
 			}
+			//} else {
+			//	klog.Infof("podInformer UpdateFunc nothing changed. name-> %v", oName)
+			//}
 		},
 		DeleteFunc: func(obj interface{}) {
 			//name := obj.GetName()

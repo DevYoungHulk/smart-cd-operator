@@ -45,9 +45,6 @@ spec:
                   as soon as it is ready)
                 format: int32
                 type: integer
-              paused:
-                description: Indicates that the deployment is paused.
-                type: boolean
               progressDeadlineSeconds:
                 description: The maximum time in seconds for a deployment to make
                   progress before it is considered to be failed. The deployment controller
@@ -7246,10 +7243,9 @@ spec:
           status:
             description: CanaryStatus defines the observed state of Canary
             properties:
+              canary-traffic:
+                type: string
               canaryReplicasSize:
-                format: int32
-                type: integer
-              canaryTargetReplicasSize:
                 description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
                   of cluster Important: Run "make" to regenerate code after modifying
                   this file'
@@ -7261,9 +7257,6 @@ spec:
               scaling:
                 type: boolean
               stableReplicasSize:
-                format: int32
-                type: integer
-              stableTargetReplicasSize:
                 format: int32
                 type: integer
             type: object

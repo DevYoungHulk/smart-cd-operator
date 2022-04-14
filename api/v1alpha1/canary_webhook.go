@@ -42,8 +42,6 @@ var _ webhook.Defaulter = &Canary{}
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *Canary) Default() {
 	canarylog.Info("default", "name", r.Name)
-
-	// TODO(user): fill in your defaulting logic.
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
@@ -62,9 +60,10 @@ func (r *Canary) ValidateCreate() error {
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Canary) ValidateUpdate(old runtime.Object) error {
 	canarylog.Info("validate update", "name", r.Name)
-
-	if r.Status.Scaling {
-		return errors.New("Canary is running. Please stop it first.")
+	if old.(*Canary).Status.Scaling {
+		if !r.IsPaused() {
+			return errors.New("Canary is running. Please pause it first.")
+		}
 	}
 	return nil
 }

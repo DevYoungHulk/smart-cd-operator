@@ -83,7 +83,8 @@ func genIngress(ctx context.Context, c client.Client, canary *v1alpha1.Canary, s
 		} else {
 			klog.Infof("Create ingress success. %s %s", i.Name, i.Namespace)
 		}
-	} else {
+	} else if i.ObjectMeta.Annotations["nginx.ingress.kubernetes.io/canary-weight"] !=
+		get.ObjectMeta.Annotations["nginx.ingress.kubernetes.io/canary-weight"] {
 		err1 := c.Update(ctx, &i)
 		if err1 != nil {
 			klog.Errorf("Update ingress failed. %v", i)
@@ -91,6 +92,8 @@ func genIngress(ctx context.Context, c client.Client, canary *v1alpha1.Canary, s
 		} else {
 			klog.Infof("Update ingress success. %s %s", i.Name, i.Namespace)
 		}
+	} else {
+		klog.Infof("Ingress weight not change.")
 	}
 	return
 }
