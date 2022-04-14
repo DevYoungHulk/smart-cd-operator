@@ -113,6 +113,7 @@ func reconcileCanary(ctx context.Context, r *CanaryReconciler, req ctrl.Request)
 						stableDeploy.Spec.Replicas = canary.Spec.Replicas
 						updateDeployment(ctx, r.Client, stableDeploy)
 					} else {
+						go applyDeployment(ctx, r.Client, canary, Canary, &canary.Status.CanaryReplicasSize)
 						klog.Infof("same version")
 					}
 					return
