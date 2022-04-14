@@ -48,7 +48,7 @@ func isSameContainers(containers1 []v1.Container, containers2 []v1.Container) bo
 	return false
 }
 
-func findStableDeployment(ctx context.Context, c client.Client, canary *cdv1alpha1.Canary) (*appsv1.Deployment, error) {
+func FindStableDeployment(ctx context.Context, c client.Client, canary *cdv1alpha1.Canary) (*appsv1.Deployment, error) {
 	stableDeploy := &appsv1.Deployment{}
 	namespacedName := types.NamespacedName{Namespace: canary.Namespace, Name: canary.Name + "--" + Stable}
 	err := c.Get(ctx, namespacedName, stableDeploy)

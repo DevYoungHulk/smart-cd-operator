@@ -20,6 +20,7 @@ import (
 	"context"
 	cdv1alpha1 "github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -52,6 +53,120 @@ func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	_ = log.FromContext(ctx)
 	//return ctrl.Result{}, nil
 	return ctrl.Result{}, reconcileCanary(ctx, r, req)
+}
+func reconcileCanary(ctx context.Context, r *CanaryReconciler, req ctrl.Request) error {
+	list := &cdv1alpha1.CanaryList{}
+	err2 := r.List(context.TODO(), list)
+	if err2 == nil {
+		for _, i := range list.Items {
+			CanaryStoreInstance().update(&i)
+		}
+	} else {
+		return err2
+	}
+	if KClientSet == nil {
+		Init(r.Client)
+	}
+	canary, err := updateLocalCache(ctx, req, r)
+	if err != nil {
+		return err
+	}
+	if canary == nil {
+		klog.Infof("Canary is deleted %s/%s", req.NamespacedName, req.Name)
+		return nil
+	}
+	if canary.IsPaused() {
+		klog.Infof("Canary %s/%s is paused.", canary.Namespace, canary.Name)
+		return nil
+	}
+	//if canary.Status.Finished {
+	//	klog.Infof("Canary %s/%s is finished.", canary.Namespace, canary.Name)
+	//	return nil
+	//}
+	go func() {
+
+		//if err == nil && isSameContainers(stableDeploy.Spec.Template.Spec.Containers, canary.Spec.Template.Spec.Containers) {
+		//	klog.Infof("same version with current stable version %s %s %s",
+		//		stableDeploy.Namespace,
+		//		stableDeploy.Name,
+		//		stableDeploy.Spec.Template.Spec.Containers[0].Name)
+		//	if *stableDeploy.Spec.Replicas == *canary.Spec.Replicas {
+		//		klog.Infof("StableDeploy replicas also same. Nothing change for this canary. %s/%s", canary.Namespace, canary.Name)
+		//		applyDeployment(ctx, r.Client, canary, Canary, &canary.Status.CanaryReplicasSize)
+		//		ingressReconcile(ctx, r.Client, canary, 0)
+		//		return
+		//	} else {
+		//		klog.Infof("StableDeploy replicas not same. Scaling canary %s/%s stable version from %d to %d",
+		//			canary.Namespace, canary.Name,
+		//			stableDeploy.Spec.Replicas, canary.Spec.Replicas)
+		//		stableDeploy.Spec.Replicas = canary.Spec.Replicas
+		//		updateDeployment(ctx, r.Client, stableDeploy)
+		//		return
+		//	}
+		//}
+		// stable version not exist.
+		if !canary.Status.Scaling {
+			stableDeploy, err := FindStableDeployment(ctx, r.Client, canary)
+			if err == nil {
+				if isSameContainers(stableDeploy.Spec.Template.Spec.Containers, canary.Spec.Template.Spec.Containers) {
+					if *stableDeploy.Spec.Replicas != *canary.Spec.Replicas {
+						stableDeploy.Spec.Replicas = canary.Spec.Replicas
+						updateDeployment(ctx, r.Client, stableDeploy)
+					} else {
+						klog.Infof("same version")
+					}
+					return
+				}
+			}
+
+			canary.Status.Scaling = true
+			canary.Status.CanaryReplicasSize = 1
+			canary.Status.StableReplicasSize = 0
+
+			if stableDeploy.Spec.Replicas == nil {
+				canary.Status.OldStableReplicasSize = 0
+			} else {
+				canary.Status.OldStableReplicasSize = *stableDeploy.Spec.Replicas
+			}
+			_ = updateCanaryStatus(ctx, r.Client, *canary)
+			return
+		}
+		//canaryMaxReplicas := calcCanaryReplicas(canary)
+
+		serviceReconcile(ctx, r.Client, canary)
+
+		//klog.Infof("ingressReconcile CanaryReplicasSize %d,"+
+		//	"\nStableReplicasSize %d,\nOldStableReplicasSize %d",
+		//	canary.Status.CanaryReplicasSize,
+		//	canary.Status.StableReplicasSize,
+		//	canary.Status.OldStableReplicasSize)
+		//canaryVersionIsZero := canary.Status.CanaryReplicasSize == 0
+		//stableVersionIsAllReady := canary.Status.StableReplicasSize == *canary.Spec.Replicas
+		//if canaryVersionIsZero || stableVersionIsAllReady {
+		//	klog.Infof("canaryVersionIsZero %v, stableVersionIsAllReady %v",
+		//		canaryVersionIsZero, stableVersionIsAllReady)
+		//	go ingressReconcile(ctx, r.Client, canary)
+		//} else {
+		//	if canary.Status.OldStableReplicasSize == 0 {
+		//		klog.Infof("Not have old stable version, setting all traffic to canary.")
+		//		go ingressReconcile(ctx, r.Client, canary)
+		//	} else if canary.Status.OldStableReplicasSize != 0 {
+		//		formatFloat := calcCanaryPodWeight(canary)
+		//		klog.Infof("Have old stable version, %d/%d canary version is ready, setting %f traffic to canary.",
+		//			canary.Status.CanaryReplicasSize,
+		//			canaryMaxReplicas,
+		//			formatFloat)
+		//		ingressReconcile(ctx, r.Client, canary)
+		//	}
+		//}
+
+		klog.Infof("scaling ---------------")
+		go applyDeployment(ctx, r.Client, canary, Canary, &canary.Status.CanaryReplicasSize)
+		if canary.Status.StableReplicasSize != 0 {
+			go applyDeployment(ctx, r.Client, canary, Stable, &canary.Status.StableReplicasSize)
+		}
+	}()
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

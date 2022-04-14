@@ -13,10 +13,16 @@ import (
 	"strconv"
 )
 
-func ingressReconcile(ctx context.Context, c client.Client, canary *cdv1alpha1.Canary, canaryWeight float64) {
+func ingressReconcile(ctx context.Context, c client.Client, canary *cdv1alpha1.Canary) {
+	canaryTraffic, err := strconv.ParseFloat(canary.Status.CanaryTraffic, 64)
+	if err != nil {
+		canaryTraffic = 0
+	}
+	klog.Infof("canary traffic (%v)", canaryTraffic)
 	if canary.Spec.Strategy.Traffic.TType == Nginx {
-		genIngress(ctx, c, canary, Stable, 1-canaryWeight)
-		genIngress(ctx, c, canary, Canary, canaryWeight)
+
+		genIngress(ctx, c, canary, Stable, 1-canaryTraffic)
+		genIngress(ctx, c, canary, Canary, canaryTraffic)
 	} else {
 		klog.Warning("istio & traefik support is building....")
 	}
