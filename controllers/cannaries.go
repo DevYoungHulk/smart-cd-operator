@@ -146,15 +146,17 @@ func updateCanaryStatusVales(ctx context.Context, c client.Client, pod *v1.Pod) 
 		// nothing change
 		return
 	}
-	canaryTest(canary)
-	if canary.IsPaused() {
-		klog.Infof("Canary is paused......")
-		return
-	}
-	err := updateCanaryStatus(ctx, c, *canary)
-	if err != nil {
-		klog.Error("updateCanaryStatusVales Canary failed.", err)
-	}
+	go func() {
+		canaryTest(canary)
+		if canary.IsPaused() {
+			klog.Infof("Canary is paused......")
+			return
+		}
+		err := updateCanaryStatus(ctx, c, *canary)
+		if err != nil {
+			klog.Error("updateCanaryStatusVales Canary failed.", err)
+		}
+	}()
 }
 
 func getReadyPodsCount(list *v1.PodList, canary *cdv1alpha1.Canary) (int32, int32) {

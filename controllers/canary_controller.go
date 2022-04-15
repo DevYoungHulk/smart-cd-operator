@@ -84,26 +84,6 @@ func reconcileCanary(ctx context.Context, r *CanaryReconciler, req ctrl.Request)
 	//	return nil
 	//}
 	go func() {
-
-		//if err == nil && isSameContainers(stableDeploy.Spec.Template.Spec.Containers, canary.Spec.Template.Spec.Containers) {
-		//	klog.Infof("same version with current stable version %s %s %s",
-		//		stableDeploy.Namespace,
-		//		stableDeploy.Name,
-		//		stableDeploy.Spec.Template.Spec.Containers[0].Name)
-		//	if *stableDeploy.Spec.Replicas == *canary.Spec.Replicas {
-		//		klog.Infof("StableDeploy replicas also same. Nothing change for this canary. %s/%s", canary.Namespace, canary.Name)
-		//		applyDeployment(ctx, r.Client, canary, Canary, &canary.Status.CanaryReplicasSize)
-		//		ingressReconcile(ctx, r.Client, canary, 0)
-		//		return
-		//	} else {
-		//		klog.Infof("StableDeploy replicas not same. Scaling canary %s/%s stable version from %d to %d",
-		//			canary.Namespace, canary.Name,
-		//			stableDeploy.Spec.Replicas, canary.Spec.Replicas)
-		//		stableDeploy.Spec.Replicas = canary.Spec.Replicas
-		//		updateDeployment(ctx, r.Client, stableDeploy)
-		//		return
-		//	}
-		//}
 		// stable version not exist.
 		if !canary.Status.Scaling {
 			stableDeploy, err := FindStableDeployment(ctx, r.Client, canary)

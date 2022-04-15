@@ -136,7 +136,9 @@ func genDeployment(canary *cdv1alpha1.Canary, side string, targetReplicas *int32
 
 	deployment.Spec.Replicas = targetReplicas
 	matchLabels[Canary] = side
+	matchLabels["canaryName"] = canary.Name
 	labels[Canary] = side
+	labels["canaryName"] = canary.Name
 	return deployment, nil
 }
 

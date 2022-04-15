@@ -19,7 +19,7 @@ spec:
     rollingUpdate:
       maxSurge: "25%"
       maxUnavailable: 0
-  replicas: 8
+  replicas: 4
   selector:
     matchLabels:
       app: nginx

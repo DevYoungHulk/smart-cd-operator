@@ -95,6 +95,8 @@ type Traffic struct {
 	Weight string `json:"weight,omitempty"`
 	// +kubebuilder:validation:Enum:=istio;nginx;traefik
 	TType string `json:"type,omitempty"`
+
+	Host string `json:"host,omitempty"`
 }
 
 type SmartPodTemplateSpec struct {

@@ -40,7 +40,7 @@ func genIngress(ctx context.Context, c client.Client, canary *v1alpha1.Canary, s
 		Spec: v1.IngressSpec{
 			Rules: []v1.IngressRule{
 				{
-					Host: "test.nginx.local",
+					Host: canary.Spec.Strategy.Traffic.Host,
 					IngressRuleValue: v1.IngressRuleValue{
 						HTTP: &v1.HTTPIngressRuleValue{
 							Paths: []v1.HTTPIngressPath{{

@@ -16,15 +16,23 @@ func serviceReconcile(ctx context.Context, c client.Client, canary *cdv1alpha1.C
 		createService(ctx, c, canary, "canary")
 		createService(ctx, c, canary, "stable")
 	} else {
+		createService(ctx, c, canary, "")
 		klog.Warning("istio support is building....")
 	}
 }
 func createService(ctx context.Context, c client.Client, canary *cdv1alpha1.Canary, side string) {
 	labels := canary.Spec.Selector.MatchLabels
-	labels[Canary] = side
+	var serviceName string
+	if len(side) > 0 {
+		labels[Canary] = side
+		serviceName = canary.Name + "--" + side
+	} else {
+		serviceName = canary.Name
+	}
+
 	s := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      canary.Name + "--" + side,
+			Name:      serviceName,
 			Namespace: canary.Namespace,
 			//Labels:    canary.Spec.Deployment.Selector.MatchLabels,
 		},
@@ -41,8 +49,8 @@ func createService(ctx context.Context, c client.Client, canary *cdv1alpha1.Cana
 	}
 
 	get := &v1.Service{}
-	name := types.NamespacedName{Namespace: canary.Namespace, Name: canary.Name}
-	err := c.Get(ctx, name, get)
+	namespacedName := types.NamespacedName{Namespace: canary.Namespace, Name: canary.Name}
+	err := c.Get(ctx, namespacedName, get)
 	if nil != err && !errors.IsNotFound(err) {
 		klog.Error(err)
 		return
