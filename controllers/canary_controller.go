@@ -109,7 +109,7 @@ func reconcileCanary(ctx context.Context, r *CanaryReconciler, req ctrl.Request)
 			} else {
 				canary.Status.OldStableReplicasSize = *stableDeploy.Spec.Replicas
 			}
-			_ = updateCanaryStatus(ctx, r.Client, *canary)
+			updateCanaryStatus(ctx, r.Client, *canary)
 			return
 		}
 		//canaryMaxReplicas := calcCanaryReplicas(canary)

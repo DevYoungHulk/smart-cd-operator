@@ -88,15 +88,20 @@ func getCanaryByNamespacedName(ctx context.Context, client client.Client, namesp
 	return client.Get(ctx, namespacedName, canary)
 }
 
-func updateCanaryStatus(ctx context.Context, client client.Client, canary cdv1alpha1.Canary) error {
-	err := client.Status().Update(ctx, &canary)
+func updateCanaryStatus(ctx context.Context, c client.Client, canary cdv1alpha1.Canary) {
+	cc := cdv1alpha1.Canary{}
+	cc.APIVersion = "cd.org.smart/v1alpha1"
+	cc.Kind = "Canary"
+	cc.Status = canary.Status
+	cc.Name = canary.Name
+	cc.Namespace = canary.Namespace
+	klog.Infof("Update Canary status %v", cc.Status)
+	err := c.Status().Patch(ctx, &cc, client.Apply, &client.PatchOptions{FieldManager: "application/apply-patch"})
 	if err != nil {
-		klog.Error("Update Canary failed", err)
-		return err
+		klog.Error("Update Canary status failed", err)
 	} else {
-		klog.Infof("Update Canary success, status %v", canary.Status)
+		klog.Infof("Update Canary status success, status %v", cc.Status)
 	}
-	return nil
 }
 
 func updateCanaryStatusVales(ctx context.Context, c client.Client, pod *v1.Pod) {
@@ -104,8 +109,10 @@ func updateCanaryStatusVales(ctx context.Context, c client.Client, pod *v1.Pod) 
 	namespace := pod.Namespace
 	podName := pod.Name
 	list := &v1.PodList{}
-	delete(pod.Labels, Canary)
-	selector := labels.SelectorFromSet(pod.Labels)
+	selector := labels.SelectorFromSet(map[string]string{
+		"app":        pod.Labels["app"],
+		"canaryName": pod.Labels["canaryName"],
+	})
 	options := &client.ListOptions{LabelSelector: selector, Namespace: namespace}
 	err2 := c.List(ctx, list, options)
 	if err2 != nil {
@@ -120,42 +127,46 @@ func updateCanaryStatusVales(ctx context.Context, c client.Client, pod *v1.Pod) 
 	}
 
 	stableCount, canaryCount := getReadyPodsCount(list, canary)
+	klog.Infof("stableCount %v, canaryCount %v", stableCount, canaryCount)
 	canaryMaxReplicas := calcCanaryReplicas(canary)
 
-	if canaryCount >= canaryMaxReplicas {
-		canary.Status.CanaryTraffic = calcCanaryWeight(canary)
-		canary.Status.StableReplicasSize = *canary.Spec.Replicas
-	} else if canary.Status.StableReplicasSize == 0 {
+	if stableCount == 0 && canaryCount < canaryMaxReplicas {
 		canary.Status.CanaryTraffic = calcCanaryWeight(canary)
 		canary.Status.CanaryReplicasSize = canaryCount + 1
 	} else {
+		canary.Status.StableReplicasSize = *canary.Spec.Replicas
 		notUpdatedSize := *canary.Spec.Replicas - stableCount
 		if notUpdatedSize < canary.Status.CanaryReplicasSize {
 			canary.Status.CanaryReplicasSize = notUpdatedSize
-			canary.Status.CanaryTraffic = calcCanaryWeight(canary)
 			if notUpdatedSize == 0 {
-				canary.Status.CanaryTraffic = "0"
+				//canary.Status.CanaryTraffic = "0"
 				canary.Status.OldStableReplicasSize = 0
 				canary.Status.Scaling = false
 			}
 		}
+		canary.Status.CanaryTraffic = calcCanaryWeight(canary)
 	}
 	ingressReconcile(ctx, c, canary)
 
-	if len(cmp.Diff(CanaryStoreInstance().get(canary.Namespace, canary.Name), canary)) == 0 {
-		// nothing change
+	if len(cmp.Diff(CanaryStoreInstance().get(canary.Namespace, canary.Name).Status, canary.Status)) == 0 {
+		klog.Infof("Canary status nothing change")
 		return
 	}
+	CanaryStoreInstance().update(canary)
 	go func() {
 		canaryTest(canary)
 		if canary.IsPaused() {
 			klog.Infof("Canary is paused......")
 			return
 		}
-		err := updateCanaryStatus(ctx, c, *canary)
-		if err != nil {
-			klog.Error("updateCanaryStatusVales Canary failed.", err)
-		}
+		updateCanaryStatus(context.TODO(), c, *CanaryStoreInstance().get(canary.Namespace, canary.Name))
+		//if err != nil {
+		//	klog.Errorf("updateCanaryStatus failed %v", err)
+		//}
+		//err := updateCanaryStatus(ctx, c, canaryWithNewStatus)
+		//if err != nil {
+		//	klog.Error("updateCanaryStatusVales Canary failed.", err)
+		//}
 	}()
 }
 
