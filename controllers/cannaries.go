@@ -19,7 +19,10 @@ import (
 
 const defaultScaleInterval = time.Duration(30) * time.Second
 
-func canaryTest(canary *cdv1alpha1.Canary) {
+type CanaryCalc struct {
+}
+
+func (c *CanaryCalc) canaryTest(canary *cdv1alpha1.Canary) {
 	klog.Infof("Canary test sample waiting start .... we can also query prometheus or kibana here")
 	val := canary.Spec.Strategy.ScaleInterval
 	waitTime := defaultScaleInterval
@@ -31,7 +34,7 @@ func canaryTest(canary *cdv1alpha1.Canary) {
 	time.Sleep(waitTime)
 }
 
-func calcCanaryWeight(canary *cdv1alpha1.Canary) string {
+func (c *CanaryCalc) calcCanaryWeight(canary *cdv1alpha1.Canary) string {
 	if canary.Status.OldStableReplicasSize == 0 && canary.Status.StableReplicasSize == 0 {
 		return "1"
 	}
@@ -51,9 +54,9 @@ func calcCanaryWeight(canary *cdv1alpha1.Canary) string {
 	return fmt.Sprintf("%v", formatFloat)
 }
 
-func updateLocalCache(ctx context.Context, req ctrl.Request, r *CanaryReconciler) (*cdv1alpha1.Canary, error) {
+func (c *CanaryCalc) updateLocalCache(ctx context.Context, req ctrl.Request, r *CanaryReconciler) (*cdv1alpha1.Canary, error) {
 	canary := &cdv1alpha1.Canary{}
-	err := getCanaryByNamespacedName(ctx, r.Client, req.NamespacedName, canary)
+	err := c.getCanaryByNamespacedName(ctx, r.Client, req.NamespacedName, canary)
 	if errors2.IsNotFound(err) {
 		CanaryStoreInstance().del(req.Namespace, req.Name)
 		return nil, nil
@@ -81,10 +84,10 @@ func updateLocalCache(ctx context.Context, req ctrl.Request, r *CanaryReconciler
 	return canary, nil
 }
 
-func getCanary(ctx context.Context, client client.Client, namespace string, name string, canary *cdv1alpha1.Canary) error {
-	return getCanaryByNamespacedName(ctx, client, types.NamespacedName{Namespace: namespace, Name: name}, canary)
+func (c *CanaryCalc) getCanary(ctx context.Context, client client.Client, namespace string, name string, canary *cdv1alpha1.Canary) error {
+	return c.getCanaryByNamespacedName(ctx, client, types.NamespacedName{Namespace: namespace, Name: name}, canary)
 }
-func getCanaryByNamespacedName(ctx context.Context, client client.Client, namespacedName client.ObjectKey, canary *cdv1alpha1.Canary) error {
+func (c *CanaryCalc) getCanaryByNamespacedName(ctx context.Context, client client.Client, namespacedName client.ObjectKey, canary *cdv1alpha1.Canary) error {
 	return client.Get(ctx, namespacedName, canary)
 }
 
@@ -104,7 +107,7 @@ func updateCanaryStatus(ctx context.Context, c client.Client, canary cdv1alpha1.
 	}
 }
 
-func updateCanaryStatusVales(ctx context.Context, c client.Client, pod *v1.Pod) {
+func  (calc *CanaryCalc)updateCanaryStatusVales(ctx context.Context, c client.Client, pod *v1.Pod) {
 
 	namespace := pod.Namespace
 	podName := pod.Name
@@ -131,7 +134,7 @@ func updateCanaryStatusVales(ctx context.Context, c client.Client, pod *v1.Pod) 
 	canaryMaxReplicas := calcCanaryReplicas(canary)
 
 	if stableCount == 0 && canaryCount < canaryMaxReplicas {
-		canary.Status.CanaryTraffic = calcCanaryWeight(canary)
+		canary.Status.CanaryTraffic = calc.calcCanaryWeight(canary)
 		canary.Status.CanaryReplicasSize = canaryCount + 1
 	} else {
 		canary.Status.StableReplicasSize = *canary.Spec.Replicas
@@ -144,7 +147,7 @@ func updateCanaryStatusVales(ctx context.Context, c client.Client, pod *v1.Pod) 
 				canary.Status.Scaling = false
 			}
 		}
-		canary.Status.CanaryTraffic = calcCanaryWeight(canary)
+		canary.Status.CanaryTraffic = calc.calcCanaryWeight(canary)
 	}
 	ingressReconcile(ctx, c, canary)
 
@@ -154,7 +157,7 @@ func updateCanaryStatusVales(ctx context.Context, c client.Client, pod *v1.Pod) 
 	}
 	CanaryStoreInstance().update(canary)
 	go func() {
-		canaryTest(canary)
+		calc.canaryTest(canary)
 		if canary.IsPaused() {
 			klog.Infof("Canary is paused......")
 			return

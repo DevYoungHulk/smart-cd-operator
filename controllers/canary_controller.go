@@ -54,6 +54,9 @@ func (r *CanaryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	//return ctrl.Result{}, nil
 	return ctrl.Result{}, reconcileCanary(ctx, r, req)
 }
+
+var calc = CanaryCalc{}
+
 func reconcileCanary(ctx context.Context, r *CanaryReconciler, req ctrl.Request) error {
 	list := &cdv1alpha1.CanaryList{}
 	err2 := r.List(context.TODO(), list)
@@ -64,10 +67,8 @@ func reconcileCanary(ctx context.Context, r *CanaryReconciler, req ctrl.Request)
 	} else {
 		return err2
 	}
-	if KClientSet == nil {
-		Init(r.Client)
-	}
-	canary, err := updateLocalCache(ctx, req, r)
+
+	canary, err := calc.updateLocalCache(ctx, req, r)
 	if err != nil {
 		return err
 	}

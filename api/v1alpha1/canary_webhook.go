@@ -20,17 +20,14 @@ import (
 	"errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	client2 "sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 // log is for logging in this package.
 var canarylog = logf.Log.WithName("canary-resource")
-var client client2.Client
 
 func (r *Canary) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	client = mgr.GetClient()
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
