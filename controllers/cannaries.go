@@ -3,6 +3,10 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
 	cdv1alpha1 "github.com/DevYoungHulk/smart-cd-operator/api/v1alpha1"
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -12,9 +16,6 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const defaultScaleInterval = time.Duration(30) * time.Second
@@ -107,7 +108,7 @@ func updateCanaryStatus(ctx context.Context, c client.Client, canary cdv1alpha1.
 	}
 }
 
-func  (calc *CanaryCalc)updateCanaryStatusVales(ctx context.Context, c client.Client, pod *v1.Pod) {
+func updateCanaryStatusVales(ctx context.Context, c client.Client, pod *v1.Pod) {
 
 	namespace := pod.Namespace
 	podName := pod.Name
